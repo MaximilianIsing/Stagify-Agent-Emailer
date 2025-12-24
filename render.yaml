@@ -3,7 +3,7 @@ services:
     name: stagify-ai-emailer
     runtime: node
     plan: starter
-    buildCommand: PUPPETEER_SKIP_DOWNLOAD=true npm install
+    buildCommand: npm install
     startCommand: npm start
     envVars:
       - key: NODE_ENV

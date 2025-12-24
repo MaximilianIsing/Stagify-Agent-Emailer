@@ -1,5 +1,6 @@
 const express = require('express');
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-core');
+const chromium = require('chromium');
 const OpenAI = require('openai');
 const fs = require('fs');
 const path = require('path');
@@ -125,10 +126,48 @@ app.post('/extract-listing', async (req, res) => {
 
     debugLog(`Starting extraction for agent: ${agentName} (formatted: ${formattedAgentName})`);
 
-    // Launch browser
-    // On Render, Chromium may download on first use if skipped during install
+    // Launch browser - use same approach as citation-generator
+    // Try chromium package first, then fallback to other paths
+    let executablePath = null;
+    
+    // Try chromium package first
+    try {
+      const chromiumPath = chromium.path;
+      if (chromiumPath && fs.existsSync(chromiumPath)) {
+        executablePath = chromiumPath;
+        debugLog('Found Chromium at:', chromiumPath);
+      }
+    } catch (e) {
+      debugLog('Chromium package path not available:', e.message);
+    }
+
+    // Fallback to environment variable or common locations
+    if (!executablePath) {
+      const possiblePaths = [
+        process.env.PUPPETEER_EXECUTABLE_PATH,
+        '/opt/render/.cache/puppeteer/chrome-linux64/chrome',
+        '/opt/render/.cache/puppeteer/chrome/chrome',
+        '/usr/bin/google-chrome',
+        '/usr/bin/chromium-browser'
+      ];
+
+      for (const chromePath of possiblePaths) {
+        if (chromePath && fs.existsSync(chromePath)) {
+          executablePath = chromePath;
+          debugLog('Found Chrome at:', chromePath);
+          break;
+        }
+      }
+    }
+
+    if (!executablePath) {
+      throw new Error('Chrome/Chromium not found. Please ensure Chrome is installed during build process.');
+    }
+
+    debugLog('Using executablePath:', executablePath);
+
     const browser = await puppeteer.launch({
-      headless: true,
+      headless: 'new',
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -137,10 +176,11 @@ app.post('/extract-listing', async (req, res) => {
         '--no-first-run',
         '--no-zygote',
         '--single-process',
-        '--disable-gpu'
+        '--disable-gpu',
+        '--disable-web-security',
+        '--disable-features=VizDisplayCompositor'
       ],
-      // Allow Puppeteer to download Chromium if not present
-      timeout: 60000
+      executablePath: executablePath
     });
 
     const page = await browser.newPage();
