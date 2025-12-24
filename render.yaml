@@ -3,15 +3,9 @@ services:
     name: stagify-ai-emailer
     runtime: node
     plan: starter
-    region: oregon
-    buildCommand: npm install
+    buildCommand: npm install --verbose
     startCommand: npm start
     envVars:
       - key: NODE_ENV
         value: production
-      # PORT is automatically set by Render, don't override it
-      # Required: Set these in Render Dashboard > Environment:
-      # - ENDPOINT_KEY
-      # - GPT_API_KEY
-      # - DEBUG (optional, "true" or "false")
     healthCheckPath: /health
