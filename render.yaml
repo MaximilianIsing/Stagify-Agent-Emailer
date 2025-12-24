@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: stagify-ai-emailer
+    runtime: node
+    plan: starter
+    region: oregon
+    buildCommand: npm install && npm install puppeteer
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 18.x
+      - key: PORT
+        value: 10000
+      # Required: Set these in Render Dashboard > Environment
+      # - ENDPOINT_KEY: Your endpoint authentication key
+      # - GPT_API_KEY: Your OpenAI API key
+      # - DEBUG: "true" or "false" (optional, defaults to false)
+    healthCheckPath: /health
+    # Puppeteer configuration for Render
+    # Note: Puppeteer will automatically download Chromium
+    # If you encounter issues, you may need to use puppeteer-core with a custom Chromium path
+

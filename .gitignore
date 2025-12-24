@@ -1,0 +1,7 @@
+node_modules/
+.env
+*.log
+.DS_Store
+gpt-key.txt
+endpointkey.txt
+debug.txt
