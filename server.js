@@ -126,6 +126,7 @@ app.post('/extract-listing', async (req, res) => {
     debugLog(`Starting extraction for agent: ${agentName} (formatted: ${formattedAgentName})`);
 
     // Launch browser
+    // On Render, Chromium may download on first use if skipped during install
     const browser = await puppeteer.launch({
       headless: true,
       args: [
@@ -137,7 +138,9 @@ app.post('/extract-listing', async (req, res) => {
         '--no-zygote',
         '--single-process',
         '--disable-gpu'
-      ]
+      ],
+      // Allow Puppeteer to download Chromium if not present
+      timeout: 60000
     });
 
     const page = await browser.newPage();
