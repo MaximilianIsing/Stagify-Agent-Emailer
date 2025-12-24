@@ -7,8 +7,11 @@ services:
     buildCommand: npm install
     startCommand: npm start
     envVars:
-      - key: NODE_VERSION
-        value: 18.x
-      - key: PORT
-        value: 10000
+      - key: NODE_ENV
+        value: production
+      # PORT is automatically set by Render, don't override it
+      # Required: Set these in Render Dashboard > Environment:
+      # - ENDPOINT_KEY
+      # - GPT_API_KEY
+      # - DEBUG (optional, "true" or "false")
     healthCheckPath: /health
