@@ -1,0 +1,15 @@
+# Secrets and local config
+key.txt
+resendkey.txt
+email.txt
+debug.txt
+
+# Cached staged images
+staged_cache/
+
+# Python
+__pycache__/
+*.pyc
+.env
+*.log
+.DS_Store
