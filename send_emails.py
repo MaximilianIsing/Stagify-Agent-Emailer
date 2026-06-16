@@ -233,14 +233,17 @@ def build_html_email(name, address):
 
           <!-- Header -->
           <tr>
-            <td style="background-color:#3b82f6; padding:30px 40px;
+            <td style="background-color:rgb(37, 99, 235); padding:30px 40px;
                         text-align:center;">
-              <h1 style="color:#ffffff; margin:0; font-size:30px;
+              <h1 style="margin:0; font-size:30px;
                          font-family:'Inter',Arial,Helvetica,sans-serif;
-                         font-weight:700; letter-spacing:0;">stagify.ai</h1>
+                         font-weight:700; letter-spacing:0;">
+                <a href="https://stagify.ai"
+                   style="color:#ffffff; text-decoration:none;">stagify.ai</a>
+              </h1>
               <p style="color:#bfdbfe; margin:6px 0 0; font-size:12px;
-                        letter-spacing:0.5px; line-height:1.5;">
-                Free virtual staging with<br />one click</p>
+                        letter-spacing:0.5px; line-height:1.5; white-space:nowrap;">
+                Free virtual staging with one click</p>
             </td>
           </tr>
 
