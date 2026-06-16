@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}CSV Errors — {{ csv_entry.original_name }}{% endblock %}
+{% block body %}
+<header>
+  <h1>CSV Row Errors</h1>
+  <a class="btn btn-muted" href="{{ url_for('dashboard') }}">Back to dashboard</a>
+</header>
+<main>
+  <div class="card">
+    <p><strong>{{ csv_entry.original_name }}</strong></p>
+    <p class="muted">{{ valid_count }} valid row(s) · {{ skipped|length }} skipped row(s)</p>
+  </div>
+
+  {% if skipped %}
+  <div class="card">
+    <table>
+      <thead>
+        <tr>
+          <th>Line</th>
+          <th>Reason</th>
+          <th>Row preview</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in skipped %}
+        <tr>
+          <td>{{ item.line }}</td>
+          <td>{{ item.reason }}</td>
+          <td class="muted">{{ item.preview or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="card">
+    <p class="muted">No skipped rows recorded for this upload.</p>
+  </div>
+  {% endif %}
+</main>
+{% endblock %}
