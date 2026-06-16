@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Stagify Email Admin{% endblock %}
+{% block body %}
+<header>
+  <h1>STAGIFY EMAIL ADMIN</h1>
+  <form method="post" action="{{ url_for('logout') }}">
+    <button class="btn btn-muted" type="submit">Log out</button>
+  </form>
+</header>
+<main>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      <div class="flash {{ category }}">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  <div class="stats">
+    <div class="stat"><strong>{{ counts.pending }}</strong><span>Pending review</span></div>
+    <div class="stat"><strong>{{ counts.sent }}</strong><span>Sent drafts</span></div>
+    <div class="stat"><strong>{{ sent_total }}</strong><span>Unique recipients</span></div>
+    <div class="stat"><strong>{{ counts.rejected }}</strong><span>Rejected</span></div>
+    <div class="stat"><strong>{{ counts.failed }}</strong><span>Failed</span></div>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0;">Agent lists (CSV upload)</h3>
+    <p class="muted">Upload a CSV with columns: Name, Email Address, Listing Address, Image URL, Staged?, Image Type.</p>
+    <form method="post" action="{{ url_for('upload_csv') }}" enctype="multipart/form-data">
+      <input type="hidden" name="status" value="{{ status_filter }}" />
+      <input type="file" name="csv_file" accept=".csv,text/csv" required />
+      <button class="btn btn-primary" type="submit" style="margin-top:8px;">Upload CSV</button>
+    </form>
+
+    {% if csv_uploads %}
+    <table style="margin-top:16px;">
+      <thead>
+        <tr>
+          <th>File</th>
+          <th>Valid</th>
+          <th>Skipped</th>
+          <th>Uploaded</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for csv in csv_uploads %}
+        <tr>
+          <td>{{ csv.original_name }}</td>
+          <td>{{ csv.valid_row_count or csv.row_count }}</td>
+          <td>
+            {% if csv.skipped_row_count %}
+              <a href="{{ url_for('csv_errors', csv_id=csv.id) }}">{{ csv.skipped_row_count }}</a>
+            {% else %}
+              0
+            {% endif %}
+          </td>
+          <td class="muted">{{ csv.uploaded_at[:19] if csv.uploaded_at else '' }}</td>
+          <td>
+            {% if csv.active %}
+              <span class="badge sent">Active</span>
+            {% else %}
+              <span class="badge rejected">Inactive</span>
+            {% endif %}
+          </td>
+          <td>
+            <form class="inline" method="post" action="{{ url_for('toggle_csv', csv_id=csv.id) }}">
+              <input type="hidden" name="status" value="{{ status_filter }}" />
+              <button class="btn btn-muted" type="submit">
+                {% if csv.active %}Deactivate{% else %}Activate{% endif %}
+              </button>
+            </form>
+            <form class="inline" method="post" action="{{ url_for('remove_csv', csv_id=csv.id) }}"
+                  onsubmit="return confirm('Delete {{ csv.original_name }}?')">
+              <input type="hidden" name="status" value="{{ status_filter }}" />
+              <button class="btn btn-danger" type="submit">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+      <p class="muted" style="margin-bottom:0;">No CSVs uploaded yet. Upload one to start generating drafts.</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0;">Debug mode</h3>
+    <p class="muted">When enabled, approved emails are sent to your debug address instead of the real recipient. The recipient is not marked as sent.</p>
+    <form method="post" action="{{ url_for('update_debug_settings') }}">
+      <input type="hidden" name="status" value="{{ status_filter }}" />
+      <label class="debug-toggle">
+        <input type="checkbox" name="debug_enabled" {% if debug_settings.enabled %}checked{% endif %} />
+        Send to debug email instead of recipient
+      </label>
+      <label for="debug_email" class="muted">Debug email</label>
+      <input type="email" id="debug_email" name="debug_email"
+             value="{{ debug_settings.email }}" placeholder="you@example.com" />
+      <button class="btn btn-primary" type="submit">Save debug settings</button>
+    </form>
+    {% if debug_settings.enabled and debug_settings.email %}
+      <p class="debug-banner">Debug active — sends go to <strong>{{ debug_settings.email }}</strong></p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <p class="muted" style="margin-top:0;">
+      Background worker:
+      {% if worker.running %}running{% else %}stopped{% endif %}
+      {% if worker.last_run %} · last run {{ worker.last_run }}{% endif %}
+      {% if worker.last_error %} · error: {{ worker.last_error }}{% endif %}
+    </p>
+
+    <div class="tabs">
+      {% for s, label in [
+        ('pending', 'Pending'),
+        ('sent', 'Sent'),
+        ('rejected', 'Rejected'),
+        ('failed', 'Failed'),
+        ('all', 'All')
+      ] %}
+        <a href="{{ url_for('dashboard', status=s) }}"
+           class="{% if status_filter == s %}active{% endif %}">{{ label }}</a>
+      {% endfor %}
+    </div>
+
+    {% if drafts %}
+    <table>
+      <thead>
+        <tr>
+          <th>Recipient</th>
+          <th>Listing</th>
+          <th>Status</th>
+          <th>Created</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for draft in drafts %}
+        <tr>
+          <td>
+            <strong>{{ draft.name }}</strong><br>
+            <span class="muted">{{ draft.email }}</span>
+          </td>
+          <td>{{ draft.address }}</td>
+          <td><span class="badge {{ draft.status }}">{{ draft.status }}</span></td>
+          <td class="muted">{{ draft.created_at[:19] if draft.created_at else '' }}</td>
+          <td>
+            <div class="thumb-pair">
+              <img src="{{ url_for('draft_original_image', draft_id=draft.id) }}"
+                   alt="Before" title="Before" />
+              <img src="{{ url_for('draft_image', draft_id=draft.id) }}"
+                   alt="After" title="After staging" />
+            </div>
+            <a class="btn btn-muted" href="{{ url_for('draft_detail', draft_id=draft.id) }}">Preview</a>
+            {% if draft.status == 'pending' %}
+            <form class="inline" method="post" action="{{ url_for('approve_draft', draft_id=draft.id) }}">
+              <button class="btn btn-primary" type="submit"
+                      onclick="return confirm('{% if debug_settings.enabled and debug_settings.email %}Send debug email to {{ debug_settings.email }} instead of {{ draft.email }}?{% else %}Send this email to {{ draft.email }}?{% endif %}')">
+                Approve &amp; Send
+              </button>
+            </form>
+            <form class="inline" method="post" action="{{ url_for('reject_draft', draft_id=draft.id) }}">
+              <button class="btn btn-danger" type="submit">Reject</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+      <p>No drafts in this view.</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0;">Sent registry (duplicate prevention)</h3>
+    <p class="muted">Each recipient email can only be sent once. Recent sends:</p>
+    {% if sent_records %}
+    <table>
+      <thead>
+        <tr>
+          <th>Email</th>
+          <th>Name</th>
+          <th>Address</th>
+          <th>Sent at</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for record in sent_records %}
+        <tr>
+          <td>{{ record.email }}</td>
+          <td>{{ record.name }}</td>
+          <td>{{ record.address }}</td>
+          <td class="muted">{{ record.sent_at[:19] if record.sent_at else '' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+      <p class="muted">No emails sent yet.</p>
+    {% endif %}
+  </div>
+</main>
+{% endblock %}

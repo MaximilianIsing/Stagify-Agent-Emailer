@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}Stagify Email Admin{% endblock %}</title>
+  <style>
+    :root {
+      --blue: #3b82f6;
+      --blue-dark: #2563eb;
+      --bg: #f0f7ff;
+      --card: #ffffff;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --border: #dbeafe;
+      --danger: #dc2626;
+      --success: #16a34a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    header {
+      background: var(--blue);
+      color: white;
+      padding: 16px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    header h1 { margin: 0; font-size: 20px; letter-spacing: 1px; }
+    main { max-width: 1200px; margin: 0 auto; padding: 24px; }
+    .card {
+      background: var(--card);
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      box-shadow: 0 2px 12px rgba(59,130,246,0.08);
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    .flash {
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+    }
+    .flash.error { background: #fee2e2; color: #991b1b; }
+    .flash.success { background: #dcfce7; color: #166534; }
+    .btn {
+      display: inline-block;
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+      text-decoration: none;
+      font-size: 14px;
+    }
+    .btn-primary { background: var(--blue); color: white; }
+    .btn-primary:hover { background: var(--blue-dark); }
+    .btn-danger { background: var(--danger); color: white; }
+    .btn-muted { background: #e5e7eb; color: var(--text); }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .stat {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+      text-align: center;
+    }
+    .stat strong { display: block; font-size: 24px; color: var(--blue); }
+    .stat span { color: var(--muted); font-size: 13px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td {
+      text-align: left;
+      padding: 10px 8px;
+      border-bottom: 1px solid #eef2ff;
+      vertical-align: top;
+      font-size: 14px;
+    }
+    th { color: var(--muted); font-weight: 600; }
+    .tabs a {
+      display: inline-block;
+      margin-right: 8px;
+      margin-bottom: 16px;
+      padding: 8px 14px;
+      border-radius: 999px;
+      text-decoration: none;
+      color: var(--muted);
+      background: white;
+      border: 1px solid var(--border);
+    }
+    .tabs a.active {
+      background: var(--blue);
+      color: white;
+      border-color: var(--blue);
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .badge.pending { background: #fef3c7; color: #92400e; }
+    .badge.sent { background: #dcfce7; color: #166534; }
+    .badge.rejected { background: #fee2e2; color: #991b1b; }
+    .badge.failed { background: #fecaca; color: #7f1d1d; }
+    form.inline { display: inline; }
+    .muted { color: var(--muted); font-size: 13px; }
+    input[type=password],
+    input[type=email],
+    input[type=text],
+    input[type=file],
+    .password-input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 12px;
+    }
+    .password-field {
+      position: relative;
+      margin-bottom: 12px;
+    }
+    .password-field .password-input {
+      width: 100%;
+      padding-right: 76px;
+      margin-bottom: 0;
+    }
+    .password-field .password-toggle {
+      position: absolute;
+      right: 6px;
+      top: 50%;
+      transform: translateY(-50%);
+      min-width: 64px;
+      padding: 6px 10px;
+      font-size: 13px;
+      border: 1px solid var(--border);
+      background: #f8fbff;
+    }
+    .password-field .password-toggle:hover {
+      background: #eef4ff;
+    }
+    .password-input.password-visible {
+      font-family: Consolas, "Courier New", monospace;
+      letter-spacing: 0.03em;
+    }
+    .debug-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+      font-weight: 600;
+    }
+    .debug-toggle input { width: auto; margin: 0; }
+    .debug-banner {
+      margin: 12px 0 0;
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: #fef3c7;
+      color: #92400e;
+      font-size: 14px;
+    }
+    .compare-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .compare-panel {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      background: white;
+    }
+    .compare-panel h4 {
+      margin: 0;
+      padding: 10px 12px;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--muted);
+      background: #f8fbff;
+      border-bottom: 1px solid var(--border);
+    }
+    .compare-panel img {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+    .thumb-pair {
+      display: flex;
+      gap: 6px;
+      margin-top: 6px;
+    }
+    .thumb-pair img {
+      width: 72px;
+      height: 48px;
+      object-fit: cover;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+    @media (max-width: 800px) {
+      .compare-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  {% block body %}{% endblock %}
+</body>
+</html>

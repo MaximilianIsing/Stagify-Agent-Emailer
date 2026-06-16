@@ -1,11 +1,19 @@
-# Secrets and local config
+# Secrets and local config (txt files only)
 key.txt
 resendkey.txt
 email.txt
-debug.txt
+session_secret.txt
+.session_secret
+.session_secret
 
 # Cached staged images
 staged_cache/
+
+# Runtime data (drafts, sent registry, uploaded CSVs)
+data/
+
+# Local CSV files (upload via dashboard instead)
+*.csv
 
 # Python
 __pycache__/

@@ -14,19 +14,19 @@ import re
 import sys
 from pathlib import Path
 
+from debug_settings import debug_subject, is_debug_active, load_debug_settings, resolve_recipients
+from csv_parser import parse_csv as engine_parse_csv
+
 SCRIPT_DIR = Path(__file__).parent
 
 # ─── Load configuration ─────────────────────────────────────────────────────
-DEBUG = SCRIPT_DIR.joinpath("debug.txt").read_text().strip().lower() == "true"
 STAGIFY_KEY = SCRIPT_DIR.joinpath("key.txt").read_text().strip()
 RESEND_KEY = SCRIPT_DIR.joinpath("resendkey.txt").read_text().strip()
 FROM_EMAIL = SCRIPT_DIR.joinpath("email.txt").read_text().strip()
-DEBUG_EMAILS = ["maximilianbising@gmail.com", "lucasshtainer1@gmail.com"]
 
 STAGIFY_HOST = "https://stagify.ai"
 STAGE_ENDPOINT = f"{STAGIFY_HOST}/api/stage-by-endpoint-key"
 RESEND_URL = "https://api.resend.com/emails"
-CSV_FILE = SCRIPT_DIR / "NYC Compass Agents Sheet - Sheet1.csv"
 CACHE_DIR = SCRIPT_DIR / "staged_cache"
 
 STAGE_DELAY = 3
@@ -237,10 +237,10 @@ def build_html_email(name, address):
                         text-align:center;">
               <h1 style="color:#ffffff; margin:0; font-size:30px;
                          font-family:'Inter',Arial,Helvetica,sans-serif;
-                         font-weight:700; letter-spacing:3px;">STAGIFY</h1>
+                         font-weight:700; letter-spacing:0;">stagify.ai</h1>
               <p style="color:#bfdbfe; margin:6px 0 0; font-size:12px;
-                        letter-spacing:1.5px; text-transform:uppercase;">
-                Virtual Staging Made Simple</p>
+                        letter-spacing:0.5px; line-height:1.5;">
+                Free virtual staging with<br />one click</p>
             </td>
           </tr>
 
@@ -302,9 +302,9 @@ def build_html_email(name, address):
                   </td>
                   <td style="padding-left:10px; vertical-align:middle;">
                     <a href="https://stagify.ai" style="text-decoration:none;">
-                      <img src="https://stagify.ai/bimi-logo.svg"
-                           alt="Stagify" width="28" height="28"
-                           style="display:block; width:28px; height:28px;
+                      <img src="https://stagify.ai/logo-full.png"
+                           alt="Stagify" width="36" height="36"
+                           style="display:block; width:36px; height:36px;
                                   border:0;" />
                     </a>
                   </td>
@@ -336,7 +336,7 @@ def extract_b64_and_mime(data_url):
 
 
 def send_email(to_email, subject, html, staged_image_data):
-    recipients = DEBUG_EMAILS if DEBUG else [to_email]
+    recipients, _ = resolve_recipients(to_email)
 
     raw_b64, mime = extract_b64_and_mime(staged_image_data)
     ext = mime.split("/")[-1].replace("jpeg", "jpg")
@@ -344,7 +344,7 @@ def send_email(to_email, subject, html, staged_image_data):
     payload = {
         "from": f"Stagify Team <{FROM_EMAIL}>",
         "to": recipients,
-        "subject": subject,
+        "subject": debug_subject(subject, to_email),
         "html": html,
         "attachments": [
             {
@@ -387,13 +387,19 @@ def main():
     parser = argparse.ArgumentParser(description="Stagify email campaign")
     parser.add_argument("--limit", type=int, default=0,
                         help="Max number of emails to send (0 = all)")
+    parser.add_argument("--csv", type=str, default="",
+                        help="Path to a CSV file (default: active uploads in data/csvs/)")
     args = parser.parse_args()
     limit = args.limit
 
     print("=" * 64)
     print("  STAGIFY — COMPASS BROKER EMAIL CAMPAIGN")
     print("=" * 64)
-    mode = f"ON -> all emails go to {', '.join(DEBUG_EMAILS)}" if DEBUG else "OFF"
+    debug_settings = load_debug_settings()
+    if is_debug_active():
+        mode = f"ON -> all emails go to {debug_settings['email']}"
+    else:
+        mode = "OFF"
     print(f"  Debug mode : {mode}")
     print(f"  Stagify API: {STAGIFY_HOST}")
     print(f"  From       : {FROM_EMAIL}")
@@ -401,7 +407,9 @@ def main():
         print(f"  Limit      : {limit} email(s)")
     print()
 
-    rows = parse_csv()
+    rows = engine_parse_csv(args.csv if args.csv else None)
+    if isinstance(rows, dict):
+        rows = rows["rows"]
     if limit:
         rows = rows[:limit]
     print(f"  Parsed {len(rows)} rows to process")
@@ -467,7 +475,8 @@ def main():
 
         html = build_html_email(row["name"], row["address"])
         subject = row["address"]
-        target = ", ".join(DEBUG_EMAILS) if DEBUG else row["email"]
+        recipients, _ = resolve_recipients(row["email"])
+        target = recipients[0]
 
         print(f"  [{i+1}/{len(rows)}]  ->  {target}  |  {subject}")
 
