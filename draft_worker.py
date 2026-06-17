@@ -51,7 +51,9 @@ def _should_skip_row(row):
     draft_id = draft_id_for_row(row)
     if draft_exists(draft_id):
         existing = get_draft(draft_id)
-        if existing and existing.get("status") in ("pending", "rejected", "sent", "failed"):
+        if existing and existing.get("status") in (
+            "pending", "rejected", "sent", "failed", "discarded"
+        ):
             return "draft_exists"
     return None
 

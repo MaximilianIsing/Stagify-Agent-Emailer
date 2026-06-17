@@ -36,8 +36,16 @@
     <form class="inline" method="post" action="{{ url_for('reject_draft', draft_id=draft.id) }}">
       <button class="btn btn-danger" type="submit">Reject</button>
     </form>
-    {% elif draft.status == 'rejected' %}
+    {% elif draft.status in ('rejected', 'failed') %}
     <button type="button" class="btn btn-primary" id="restage-detail-open">Restage</button>
+    <form class="inline" method="post" action="{{ url_for('discard_draft_route', draft_id=draft.id) }}"
+          onsubmit="return confirm('Discard this draft? It will move to Discarded.')">
+      <input type="hidden" name="return_to" value="detail" />
+      <button class="btn btn-danger" type="submit">Discard</button>
+    </form>
+    {% if draft.error %}
+    <p class="muted" style="margin:8px 0 0;">{{ draft.error }}</p>
+    {% endif %}
     <span class="badge {{ draft.status }}">{{ draft.status }}</span>
     {% else %}
     <span class="badge {{ draft.status }}">{{ draft.status }}</span>
@@ -49,7 +57,7 @@
             style="width:100%; height:900px; border:0;"></iframe>
   </div>
 
-  {% if draft.status == 'rejected' %}
+  {% if draft.status in ('rejected', 'failed') %}
   <div class="modal-overlay" id="restage-modal" hidden>
     <div class="modal-card" role="dialog" aria-labelledby="restage-modal-title">
       <h3 id="restage-modal-title">Restage draft</h3>
@@ -69,7 +77,7 @@
   </div>
   {% endif %}
 </main>
-{% if draft.status == 'rejected' %}
+{% if draft.status in ('rejected', 'failed') %}
 <script>
 (function () {
   var modal = document.getElementById('restage-modal');

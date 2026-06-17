@@ -19,13 +19,17 @@ from csv_store import delete_csv, get_csv, get_parse_report, list_csvs, reconcil
 from debug_settings import load_debug_settings, save_debug_settings
 from row_range import format_row_range
 from draft_store import (
+    DISCARDABLE_STATUSES,
+    RESTAGEABLE_STATUSES,
     count_by_status,
+    discard_draft,
     get_draft,
     get_email_html,
     get_original_image,
     get_staged_data,
     list_drafts,
     reject_all_pending,
+    restage_all_failed,
     restage_all_rejected,
     restage_draft,
     save_original_image,
@@ -400,12 +404,16 @@ def restage_draft_route(draft_id):
         flash("Draft not found.", "error")
         return redirect(url_for("dashboard", status="rejected"))
 
-    if draft["status"] != "rejected":
-        flash(f"Only rejected drafts can be restaged (current: {draft['status']}).", "error")
+    return_to = request.form.get("return_to", draft.get("status", "rejected"))
+
+    if draft["status"] not in RESTAGEABLE_STATUSES:
+        flash(
+            f"Only rejected or failed drafts can be restaged (current: {draft['status']}).",
+            "error",
+        )
         return redirect(url_for("dashboard", status=draft["status"]))
 
     additional_prompt = request.form.get("additional_prompt", "")
-    return_to = request.form.get("return_to", "rejected")
 
     try:
         restage_draft(draft_id, additional_prompt)
@@ -422,7 +430,36 @@ def restage_draft_route(draft_id):
 
     if return_to == "detail":
         return redirect(url_for("draft_detail", draft_id=draft_id))
-    return redirect(url_for("dashboard", status="rejected"))
+    return redirect(url_for("dashboard", status=return_to if return_to in RESTAGEABLE_STATUSES else "rejected"))
+
+
+@app.post("/drafts/<draft_id>/discard")
+@login_required
+def discard_draft_route(draft_id):
+    draft = get_draft(draft_id)
+    if not draft:
+        flash("Draft not found.", "error")
+        return redirect(url_for("dashboard", status="rejected"))
+
+    return_to = request.form.get("return_to", draft.get("status", "rejected"))
+
+    if draft["status"] not in DISCARDABLE_STATUSES:
+        flash(
+            f"Only rejected or failed drafts can be discarded (current: {draft['status']}).",
+            "error",
+        )
+        return redirect(url_for("dashboard", status=draft["status"]))
+
+    try:
+        discard_draft(draft_id)
+        flash(f"Discarded draft for {draft['email']}.", "success")
+        return redirect(url_for("dashboard", status="discarded"))
+    except ValueError as exc:
+        flash(str(exc), "error")
+
+    if return_to == "detail":
+        return redirect(url_for("draft_detail", draft_id=draft_id))
+    return redirect(url_for("dashboard", status=return_to))
 
 
 @app.post("/drafts/reject-all")
@@ -439,19 +476,26 @@ def reject_all_drafts():
 @app.post("/drafts/restage-all")
 @login_required
 def restage_all_drafts():
-    restaged, failed = restage_all_rejected()
+    scope = request.form.get("scope", "rejected")
+    if scope == "failed":
+        restaged, errors = restage_all_failed()
+        label = "failed"
+    else:
+        restaged, errors = restage_all_rejected()
+        label = "rejected"
+
     if restaged:
         flash(
-            f"Restaged {restaged} rejected draft(s) — moved to pending for review.",
+            f"Restaged {restaged} {label} draft(s) — moved to pending for review.",
             "success",
         )
-    if failed:
-        sample = "; ".join(f"{email}: {err}" for email, err in failed[:3])
-        extra = f" (+{len(failed) - 3} more)" if len(failed) > 3 else ""
-        flash(f"{len(failed)} restage(s) failed. {sample}{extra}", "error")
-    if not restaged and not failed:
-        flash("No rejected drafts to restage.", "error")
-    return redirect(url_for("dashboard", status="pending" if restaged else "rejected"))
+    if errors:
+        sample = "; ".join(f"{email}: {err}" for email, err in errors[:3])
+        extra = f" (+{len(errors) - 3} more)" if len(errors) > 3 else ""
+        flash(f"{len(errors)} restage(s) failed. {sample}{extra}", "error")
+    if not restaged and not errors:
+        flash(f"No {label} drafts to restage.", "error")
+    return redirect(url_for("dashboard", status="pending" if restaged else label))
 
 
 def create_app():

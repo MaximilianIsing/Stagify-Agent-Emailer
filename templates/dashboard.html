@@ -16,6 +16,7 @@
     <div class="stat"><strong>{{ sent_total }}</strong><span>Unique recipients</span></div>
     <div class="stat"><strong>{{ counts.rejected }}</strong><span>Rejected</span></div>
     <div class="stat"><strong>{{ counts.failed }}</strong><span>Failed</span></div>
+    <div class="stat"><strong>{{ counts.discarded }}</strong><span>Discarded</span></div>
   </div>
 
   <div class="card csv-card">
@@ -135,6 +136,7 @@
         ('sent', 'Sent'),
         ('rejected', 'Rejected'),
         ('failed', 'Failed'),
+        ('discarded', 'Discarded'),
         ('all', 'All')
       ] %}
         <a href="{{ url_for('dashboard', status=s) }}"
@@ -154,7 +156,17 @@
     <form method="post" action="{{ url_for('restage_all_drafts') }}"
           onsubmit="return confirm('Restage all {{ counts.rejected }} rejected draft(s) with default prompting? This may take several minutes.')"
           style="margin-bottom:16px;">
+      <input type="hidden" name="scope" value="rejected" />
       <button class="btn btn-primary" type="submit">Restage all rejected</button>
+    </form>
+    {% endif %}
+
+    {% if status_filter == 'failed' and counts.failed > 0 %}
+    <form method="post" action="{{ url_for('restage_all_drafts') }}"
+          onsubmit="return confirm('Restage all {{ counts.failed }} failed draft(s) with default prompting? This may take several minutes.')"
+          style="margin-bottom:16px;">
+      <input type="hidden" name="scope" value="failed" />
+      <button class="btn btn-primary" type="submit">Restage all failed</button>
     </form>
     {% endif %}
 
@@ -187,13 +199,19 @@
                    alt="After" title="After staging" />
             </div>
             <a class="btn btn-muted" href="{{ url_for('draft_detail', draft_id=draft.id) }}">Preview</a>
-            {% if draft.status == 'rejected' %}
+            {% if draft.status in ('rejected', 'failed') %}
             <button type="button" class="btn btn-primary btn-sm restage-open"
                     data-draft-id="{{ draft.id }}"
                     data-draft-name="{{ draft.name }}"
-                    data-draft-email="{{ draft.email }}">
+                    data-draft-email="{{ draft.email }}"
+                    data-return-to="{{ draft.status }}">
               Restage
             </button>
+            <form class="inline" method="post" action="{{ url_for('discard_draft_route', draft_id=draft.id) }}"
+                  onsubmit="return confirm('Discard draft for {{ draft.email }}? It will move to Discarded.')">
+              <input type="hidden" name="return_to" value="{{ status_filter }}" />
+              <button class="btn btn-danger btn-sm" type="submit">Discard</button>
+            </form>
             {% endif %}
             {% if draft.status == 'pending' %}
             <form class="inline" method="post" action="{{ url_for('approve_draft', draft_id=draft.id) }}">
@@ -312,6 +330,7 @@
     btn.addEventListener('click', function () {
       var draftId = btn.dataset.draftId;
       form.action = '/drafts/' + draftId + '/restage';
+      form.querySelector('input[name="return_to"]').value = btn.dataset.returnTo || 'rejected';
       subtitle.textContent = 'Reprocess staging for ' + btn.dataset.draftName
         + ' (' + btn.dataset.draftEmail + '). This may take up to a minute.';
       modal.hidden = false;
