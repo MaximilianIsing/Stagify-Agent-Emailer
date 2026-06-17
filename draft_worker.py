@@ -125,6 +125,7 @@ def process_next_draft():
             row["address"],
             image_src=f"/drafts/{draft_id}/image",
             email=row["email"],
+            track_opens=False,
         )
         create_draft(
             row,

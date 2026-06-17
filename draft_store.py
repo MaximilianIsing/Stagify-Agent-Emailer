@@ -104,6 +104,7 @@ def restage_draft(draft_id, user_additional_prompt=""):
         meta["address"],
         image_src=f"/drafts/{draft_id}/image",
         email=meta["email"],
+        track_opens=False,
     )
     (folder / "email.html").write_text(html, encoding="utf-8")
 
