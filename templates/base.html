@@ -30,8 +30,38 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
     }
     header h1 { margin: 0; font-size: 20px; letter-spacing: 1px; }
+    .header-brand {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .site-nav {
+      display: flex;
+      gap: 6px;
+    }
+    .site-nav a {
+      color: rgba(255, 255, 255, 0.88);
+      text-decoration: none;
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .site-nav a:hover,
+    .site-nav a.active {
+      background: rgba(255, 255, 255, 0.2);
+      color: white;
+    }
     main { max-width: 1200px; margin: 0 auto; padding: 24px; }
     .card {
       background: var(--card);
@@ -62,6 +92,11 @@
     .btn-primary:hover { background: var(--blue-dark); }
     .btn-danger { background: var(--danger); color: white; }
     .btn-muted { background: #e5e7eb; color: var(--text); }
+    .btn-sm {
+      padding: 4px 10px;
+      font-size: 12px;
+      border-radius: 6px;
+    }
     .stats {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -86,6 +121,12 @@
       font-size: 14px;
     }
     th { color: var(--muted); font-weight: 600; }
+    .table-compact th,
+    .table-compact td {
+      padding: 6px 8px;
+      font-size: 13px;
+      vertical-align: middle;
+    }
     .tabs a {
       display: inline-block;
       margin-right: 8px;
@@ -178,6 +219,103 @@
     .range-grid input,
     .range-grid select {
       margin-bottom: 0;
+    }
+    .csv-card { padding: 14px 16px; }
+    .csv-upload-form { margin-bottom: 12px; }
+    .csv-upload-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px 12px;
+    }
+    .csv-upload-main {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 140px;
+    }
+    .csv-title { font-size: 14px; }
+    .csv-hint { font-size: 11px; }
+    .csv-hint a { color: var(--blue-dark); }
+    .csv-file-input {
+      flex: 1 1 180px;
+      min-width: 160px;
+      margin-bottom: 0;
+      padding: 6px 8px;
+      font-size: 13px;
+    }
+    .csv-file-info {
+      font-size: 12px;
+      white-space: nowrap;
+      font-weight: 600;
+      color: var(--blue-dark);
+    }
+    .csv-range-details {
+      margin-top: 8px;
+      font-size: 12px;
+    }
+    .csv-range-details summary {
+      cursor: pointer;
+      color: var(--muted);
+      user-select: none;
+    }
+    .csv-range-note {
+      margin: 6px 0 4px;
+      font-size: 11px;
+    }
+    .range-grid.compact {
+      grid-template-columns: repeat(4, minmax(72px, 1fr));
+      gap: 6px;
+      max-width: 420px;
+    }
+    .range-grid.compact label {
+      font-size: 11px;
+      font-weight: 600;
+      gap: 3px;
+    }
+    .range-grid.compact input,
+    .range-grid.compact select {
+      padding: 5px 6px;
+      font-size: 12px;
+    }
+    .csv-table { margin-top: 4px; }
+    .csv-name { max-width: 220px; word-break: break-word; }
+    .csv-name .badge { margin-left: 6px; vertical-align: middle; }
+    .csv-rows { font-size: 12px; white-space: nowrap; }
+    .csv-date { font-size: 12px; white-space: nowrap; }
+    .csv-actions { text-align: right; white-space: nowrap; }
+    .csv-empty { margin: 8px 0 0; font-size: 13px; }
+    .purge-warning {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin: 4px 0;
+    }
+    .purge-warning p {
+      margin: 8px 0 12px;
+      font-size: 13px;
+      color: #7f1d1d;
+    }
+    .purge-warning strong { color: #991b1b; }
+    .purge-form label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+    .purge-form input {
+      margin-top: 4px;
+      margin-bottom: 0;
+    }
+    .purge-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 4px;
+    }
+    .csv-purge-row td {
+      background: #fffbfb;
+      padding-top: 0;
     }
     .debug-banner {
       margin: 12px 0 0;
