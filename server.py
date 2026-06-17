@@ -26,6 +26,7 @@ from draft_store import (
     get_staged_data,
     list_drafts,
     reject_all_pending,
+    restage_all_rejected,
     restage_draft,
     save_original_image,
     update_draft,
@@ -433,6 +434,24 @@ def reject_all_drafts():
     else:
         flash("No pending drafts to reject.", "error")
     return redirect(url_for("dashboard", status="pending"))
+
+
+@app.post("/drafts/restage-all")
+@login_required
+def restage_all_drafts():
+    restaged, failed = restage_all_rejected()
+    if restaged:
+        flash(
+            f"Restaged {restaged} rejected draft(s) — moved to pending for review.",
+            "success",
+        )
+    if failed:
+        sample = "; ".join(f"{email}: {err}" for email, err in failed[:3])
+        extra = f" (+{len(failed) - 3} more)" if len(failed) > 3 else ""
+        flash(f"{len(failed)} restage(s) failed. {sample}{extra}", "error")
+    if not restaged and not failed:
+        flash("No rejected drafts to restage.", "error")
+    return redirect(url_for("dashboard", status="pending" if restaged else "rejected"))
 
 
 def create_app():

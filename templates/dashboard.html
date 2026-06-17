@@ -150,6 +150,14 @@
     </form>
     {% endif %}
 
+    {% if status_filter == 'rejected' and counts.rejected > 0 %}
+    <form method="post" action="{{ url_for('restage_all_drafts') }}"
+          onsubmit="return confirm('Restage all {{ counts.rejected }} rejected draft(s) with default prompting? This may take several minutes.')"
+          style="margin-bottom:16px;">
+      <button class="btn btn-primary" type="submit">Restage all rejected</button>
+    </form>
+    {% endif %}
+
     {% if drafts %}
     <table>
       <thead>
