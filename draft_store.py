@@ -256,3 +256,16 @@ def reject_all_pending():
         update_draft(draft["id"], status="rejected", error=None)
         count += 1
     return count
+
+
+def restage_all_rejected():
+    rejected = list_drafts(status="rejected")
+    restaged = 0
+    failed = []
+    for draft in rejected:
+        try:
+            restage_draft(draft["id"], "")
+            restaged += 1
+        except Exception as exc:
+            failed.append((draft.get("email", draft["id"]), str(exc)))
+    return restaged, failed
