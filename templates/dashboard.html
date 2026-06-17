@@ -28,6 +28,33 @@
     <form method="post" action="{{ url_for('upload_csv') }}" enctype="multipart/form-data">
       <input type="hidden" name="status" value="{{ status_filter }}" />
       <input type="file" name="csv_file" accept=".csv,text/csv" required />
+      <div class="row-range">
+        <p class="muted" style="margin:12px 0 8px;">Row range (valid rows only, numbered from 1). Leave end blank to use the last row.</p>
+        <div class="range-grid">
+          <label>
+            Start row
+            <input type="number" name="row_start" min="1" placeholder="1" />
+          </label>
+          <label>
+            Start bound
+            <select name="row_start_bound">
+              <option value="inclusive">Inclusive</option>
+              <option value="exclusive">Exclusive</option>
+            </select>
+          </label>
+          <label>
+            End row
+            <input type="number" name="row_end" min="1" placeholder="last" />
+          </label>
+          <label>
+            End bound
+            <select name="row_end_bound">
+              <option value="inclusive">Inclusive</option>
+              <option value="exclusive">Exclusive</option>
+            </select>
+          </label>
+        </div>
+      </div>
       <button class="btn btn-primary" type="submit" style="margin-top:8px;">Upload CSV</button>
     </form>
 
@@ -37,6 +64,8 @@
         <tr>
           <th>File</th>
           <th>Valid</th>
+          <th>Selected</th>
+          <th>Range</th>
           <th>Skipped</th>
           <th>Uploaded</th>
           <th>Status</th>
@@ -48,6 +77,8 @@
         <tr>
           <td>{{ csv.original_name }}</td>
           <td>{{ csv.valid_row_count or csv.row_count }}</td>
+          <td>{{ csv.selected_row_count or csv.valid_row_count or csv.row_count }}</td>
+          <td class="muted">{{ csv.row_range | format_row_range }}</td>
           <td>
             {% if csv.skipped_row_count %}
               <a href="{{ url_for('csv_errors', csv_id=csv.id) }}">{{ csv.skipped_row_count }}</a>
@@ -124,6 +155,14 @@
            class="{% if status_filter == s %}active{% endif %}">{{ label }}</a>
       {% endfor %}
     </div>
+
+    {% if status_filter == 'pending' and counts.pending > 0 %}
+    <form method="post" action="{{ url_for('reject_all_drafts') }}"
+          onsubmit="return confirm('Reject all {{ counts.pending }} pending draft(s)?')"
+          style="margin-bottom:16px;">
+      <button class="btn btn-danger" type="submit">Reject all pending</button>
+    </form>
+    {% endif %}
 
     {% if drafts %}
     <table>

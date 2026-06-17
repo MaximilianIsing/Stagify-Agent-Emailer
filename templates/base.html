@@ -118,7 +118,9 @@
     input[type=password],
     input[type=email],
     input[type=text],
+    input[type=number],
     input[type=file],
+    select,
     .password-input {
       width: 100%;
       padding: 10px 12px;
@@ -161,6 +163,22 @@
       font-weight: 600;
     }
     .debug-toggle input { width: auto; margin: 0; }
+    .range-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+    }
+    .range-grid label {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .range-grid input,
+    .range-grid select {
+      margin-bottom: 0;
+    }
     .debug-banner {
       margin: 12px 0 0;
       padding: 10px 12px;

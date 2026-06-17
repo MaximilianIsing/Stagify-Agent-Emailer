@@ -179,6 +179,7 @@ def parse_csv_file(csv_path, source_csv_id=None):
 
             if parsed:
                 parsed["source_csv_id"] = source_csv_id
+                parsed["row_index"] = len(rows) + 1
                 rows.append(parsed)
 
     return {"rows": rows, "skipped": skipped, "source_csv_id": source_csv_id}
@@ -190,18 +191,24 @@ def parse_csv(csv_path=None, include_skipped=False):
         return result if include_skipped else result["rows"]
 
     from csv_store import get_active_csv_paths, list_csvs
+    from row_range import filter_rows_by_range
 
     rows = []
     skipped = []
-    csv_id_by_path = {
-        entry["stored_path"]: entry["id"]
+    entries_by_path = {
+        entry["stored_path"]: entry
         for entry in list_csvs()
         if entry.get("active")
     }
     for path in get_active_csv_paths():
-        source_id = csv_id_by_path.get(str(path))
+        entry = entries_by_path.get(str(path))
+        source_id = entry["id"] if entry else None
+
         result = parse_csv_file(path, source_csv_id=source_id)
-        rows.extend(result["rows"])
+        file_rows = result["rows"]
+        if entry and entry.get("row_range"):
+            file_rows = filter_rows_by_range(file_rows, entry["row_range"])
+        rows.extend(file_rows)
         skipped.extend(result["skipped"])
 
     if include_skipped:

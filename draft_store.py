@@ -181,3 +181,11 @@ def count_by_status():
         status = draft.get("status", "pending")
         counts[status] = counts.get(status, 0) + 1
     return counts
+
+
+def reject_all_pending():
+    count = 0
+    for draft in list_drafts(status="pending"):
+        update_draft(draft["id"], status="rejected", error=None)
+        count += 1
+    return count
