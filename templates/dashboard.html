@@ -19,7 +19,7 @@
     <div class="stat"><strong>{{ counts.discarded }}</strong><span>Discarded</span></div>
   </div>
 
-  <div class="card csv-card">
+  <div class="card csv-card" id="upload">
     <form class="csv-upload-form" method="post" action="{{ url_for('upload_csv') }}" enctype="multipart/form-data" id="csv-upload-form">
       <input type="hidden" name="status" value="{{ status_filter }}" />
       <div class="csv-upload-row">
@@ -32,7 +32,7 @@
         <button class="btn btn-primary btn-sm" type="submit">Upload</button>
       </div>
       <details class="csv-range-details">
-        <summary>Row range</summary>
+        <summary>Row range <span class="caret" aria-hidden="true"></span></summary>
         <p class="muted csv-range-note">Valid rows only, numbered from 1. End blank = last row.</p>
         <div class="range-grid compact">
           <label>Start <input type="number" name="row_start" id="row_start" min="1" placeholder="1" /></label>
@@ -103,8 +103,8 @@
     {% endif %}
   </div>
 
-  <div class="card">
-    <h3 style="margin-top:0;">Debug mode</h3>
+  <div class="card" id="debug">
+    <h3>Debug mode</h3>
     <p class="muted">When enabled, approved emails are sent to your debug address instead of the real recipient. The recipient is not marked as sent.</p>
     <form method="post" action="{{ url_for('update_debug_settings') }}">
       <input type="hidden" name="status" value="{{ status_filter }}" />
@@ -122,13 +122,16 @@
     {% endif %}
   </div>
 
-  <div class="card">
-    <p class="muted" style="margin-top:0;">
-      Background worker:
-      {% if worker.running %}running{% else %}stopped{% endif %}
-      {% if worker.last_run %} · last run {{ worker.last_run }}{% endif %}
-      {% if worker.last_error %} · error: {{ worker.last_error }}{% endif %}
-    </p>
+  <div class="card" id="drafts">
+    <div class="section-head">
+      <h3>Drafts</h3>
+      <span class="worker-status">
+        <span class="worker-dot {% if worker.running %}on{% else %}off{% endif %}"></span>
+        Worker {% if worker.running %}running{% else %}stopped{% endif %}
+        {% if worker.last_run %} · last run {{ worker.last_run }}{% endif %}
+        {% if worker.last_error %} · error: {{ worker.last_error }}{% endif %}
+      </span>
+    </div>
 
     <div class="tabs">
       {% for s, label in [
@@ -198,44 +201,53 @@
               <img src="{{ url_for('draft_image', draft_id=draft.id) }}"
                    alt="After" title="After staging" />
             </div>
-            <a class="btn btn-muted" href="{{ url_for('draft_detail', draft_id=draft.id) }}">Preview</a>
-            {% if draft.status in ('rejected', 'failed') %}
-            <button type="button" class="btn btn-primary btn-sm restage-open"
-                    data-draft-id="{{ draft.id }}"
-                    data-draft-name="{{ draft.name }}"
-                    data-draft-email="{{ draft.email }}"
-                    data-return-to="{{ draft.status }}">
-              Restage
-            </button>
-            <form class="inline" method="post" action="{{ url_for('discard_draft_route', draft_id=draft.id) }}"
-                  onsubmit="return confirm('Discard draft for {{ draft.email }}? It will move to Discarded.')">
-              <input type="hidden" name="return_to" value="{{ status_filter }}" />
-              <button class="btn btn-danger btn-sm" type="submit">Discard</button>
-            </form>
-            {% endif %}
-            {% if draft.status == 'pending' %}
-            <form class="inline" method="post" action="{{ url_for('approve_draft', draft_id=draft.id) }}">
-              <button class="btn btn-primary" type="submit"
-                      onclick="return confirm('{% if debug_settings.enabled and debug_settings.email %}Send debug email to {{ debug_settings.email }} instead of {{ draft.email }}?{% else %}Send this email to {{ draft.email }}?{% endif %}')">
-                Approve &amp; Send
+            <div class="row-actions">
+              <a class="btn btn-muted btn-sm" href="{{ url_for('draft_detail', draft_id=draft.id) }}">Preview</a>
+              {% if draft.status == 'rejected' %}
+              <form class="inline" method="post" action="{{ url_for('send_anyway_draft', draft_id=draft.id) }}"
+                    onsubmit="return confirm('{% if debug_settings.enabled and debug_settings.email %}Send anyway to debug address {{ debug_settings.email }} instead of {{ draft.email }}?{% else %}Send this rejected draft to {{ draft.email }} anyway?{% endif %}')">
+                <input type="hidden" name="return_to" value="{{ status_filter }}" />
+                <button class="btn btn-muted btn-sm" type="submit">Send anyway</button>
+              </form>
+              {% endif %}
+              {% if draft.status in ('rejected', 'failed') %}
+              <button type="button" class="btn btn-primary btn-sm restage-open"
+                      data-draft-id="{{ draft.id }}"
+                      data-draft-name="{{ draft.name }}"
+                      data-draft-email="{{ draft.email }}"
+                      data-return-to="{{ draft.status }}">
+                Restage
               </button>
-            </form>
-            <form class="inline" method="post" action="{{ url_for('reject_draft', draft_id=draft.id) }}">
-              <button class="btn btn-danger" type="submit">Reject</button>
-            </form>
-            {% endif %}
+              <form class="inline" method="post" action="{{ url_for('discard_draft_route', draft_id=draft.id) }}"
+                    onsubmit="return confirm('Discard draft for {{ draft.email }}? It will move to Discarded.')">
+                <input type="hidden" name="return_to" value="{{ status_filter }}" />
+                <button class="btn btn-danger btn-sm" type="submit">Discard</button>
+              </form>
+              {% endif %}
+              {% if draft.status == 'pending' %}
+              <form class="inline" method="post" action="{{ url_for('approve_draft', draft_id=draft.id) }}">
+                <button class="btn btn-primary btn-sm" type="submit"
+                        onclick="return confirm('{% if debug_settings.enabled and debug_settings.email %}Send debug email to {{ debug_settings.email }} instead of {{ draft.email }}?{% else %}Send this email to {{ draft.email }}?{% endif %}')">
+                  Approve &amp; Send
+                </button>
+              </form>
+              <form class="inline" method="post" action="{{ url_for('reject_draft', draft_id=draft.id) }}">
+                <button class="btn btn-danger btn-sm" type="submit">Reject</button>
+              </form>
+              {% endif %}
+            </div>
           </td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
     {% else %}
-      <p>No drafts in this view.</p>
+      <p class="csv-empty">No drafts in this view.</p>
     {% endif %}
   </div>
 
-  <div class="card">
-    <h3 style="margin-top:0;">Sent registry (duplicate prevention)</h3>
+  <div class="card" id="sent">
+    <h3>Sent Registry <span class="muted" style="font-weight:500;">· duplicate prevention</span></h3>
     <p class="muted">Each recipient email can only be sent once. Recent sends:</p>
     {% if sent_records %}
     <table>

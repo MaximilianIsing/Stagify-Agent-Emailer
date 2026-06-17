@@ -7,7 +7,7 @@
 {% include "_header.html" %}
 <main>
   <div class="card">
-    <h3 style="margin-top:0;">Before &amp; after</h3>
+    <h3>Before &amp; after</h3>
     <p class="muted">{{ draft.room_type }} · {{ draft.address }}</p>
     <div class="compare-grid">
       <div class="compare-panel">
@@ -24,8 +24,14 @@
   </div>
 
   <div class="card">
-    <p><strong>{{ draft.name }}</strong> · {{ draft.email }}</p>
-    <p class="muted">{{ draft.address }}</p>
+    <div class="section-head">
+      <div>
+        <p style="margin:0 0 2px;"><strong>{{ draft.name }}</strong> · {{ draft.email }}</p>
+        <p class="muted" style="margin:0;">{{ draft.address }}</p>
+      </div>
+      <span class="badge {{ draft.status }}">{{ draft.status }}</span>
+    </div>
+    <div class="row-actions">
     {% if draft.status == 'pending' %}
     <form class="inline" method="post" action="{{ url_for('approve_draft', draft_id=draft.id) }}">
       <button class="btn btn-primary" type="submit"
@@ -36,19 +42,29 @@
     <form class="inline" method="post" action="{{ url_for('reject_draft', draft_id=draft.id) }}">
       <button class="btn btn-danger" type="submit">Reject</button>
     </form>
-    {% elif draft.status in ('rejected', 'failed') %}
+    {% elif draft.status == 'rejected' %}
+    <form class="inline" method="post" action="{{ url_for('send_anyway_draft', draft_id=draft.id) }}"
+          onsubmit="return confirm('{% if debug_settings.enabled and debug_settings.email %}Send anyway to debug address {{ debug_settings.email }} instead of {{ draft.email }}?{% else %}Send this rejected draft to {{ draft.email }} anyway?{% endif %}')">
+      <input type="hidden" name="return_to" value="detail" />
+      <button class="btn btn-muted" type="submit">Send anyway</button>
+    </form>
     <button type="button" class="btn btn-primary" id="restage-detail-open">Restage</button>
     <form class="inline" method="post" action="{{ url_for('discard_draft_route', draft_id=draft.id) }}"
           onsubmit="return confirm('Discard this draft? It will move to Discarded.')">
       <input type="hidden" name="return_to" value="detail" />
       <button class="btn btn-danger" type="submit">Discard</button>
     </form>
-    {% if draft.error %}
-    <p class="muted" style="margin:8px 0 0;">{{ draft.error }}</p>
+    {% elif draft.status == 'failed' %}
+    <button type="button" class="btn btn-primary" id="restage-detail-open">Restage</button>
+    <form class="inline" method="post" action="{{ url_for('discard_draft_route', draft_id=draft.id) }}"
+          onsubmit="return confirm('Discard this draft? It will move to Discarded.')">
+      <input type="hidden" name="return_to" value="detail" />
+      <button class="btn btn-danger" type="submit">Discard</button>
+    </form>
     {% endif %}
-    <span class="badge {{ draft.status }}">{{ draft.status }}</span>
-    {% else %}
-    <span class="badge {{ draft.status }}">{{ draft.status }}</span>
+    </div>
+    {% if draft.status in ('rejected', 'failed') and draft.error %}
+    <p class="muted" style="margin:12px 0 0;">{{ draft.error }}</p>
     {% endif %}
   </div>
 

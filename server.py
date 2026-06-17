@@ -316,22 +316,12 @@ def draft_original_image(draft_id):
     return content, 200, {"Content-Type": mime}
 
 
-@app.post("/drafts/<draft_id>/approve")
-@login_required
-def approve_draft(draft_id):
-    draft = get_draft(draft_id)
-    if not draft:
-        flash("Draft not found.", "error")
-        return redirect(url_for("dashboard"))
-
-    if draft["status"] != "pending":
-        flash(f"Draft is already {draft['status']}.", "error")
-        return redirect(url_for("dashboard"))
-
+def _send_draft_email(draft_id, draft):
+    """Send a draft. Returns: sent, debug, duplicate, failed, missing_staged, config_error."""
     staged = get_staged_data(draft_id)
     if not staged:
         flash("Staged image missing.", "error")
-        return redirect(url_for("dashboard"))
+        return "missing_staged"
 
     html = build_html_email(draft["name"], draft["address"])
     debug_settings = load_debug_settings()
@@ -340,7 +330,7 @@ def approve_draft(draft_id):
         if debug_settings["enabled"]:
             if not debug_settings["email"]:
                 flash("Debug mode is on but no debug email is set.", "error")
-                return redirect(url_for("dashboard", status="pending"))
+                return "config_error"
             result = send_email(draft["email"], draft["subject"], html, staged)
             update_draft(
                 draft_id,
@@ -353,7 +343,7 @@ def approve_draft(draft_id):
                 f"(not sent to {draft['email']}).",
                 "success",
             )
-            return redirect(url_for("dashboard", status="pending"))
+            return "debug"
 
         reserve_send(draft["email"], draft["address"], draft_id, draft["name"])
         result = send_email(draft["email"], draft["subject"], html, staged)
@@ -367,16 +357,55 @@ def approve_draft(draft_id):
             error=None,
         )
         flash(f"Sent to {draft['email']}.", "success")
+        return "sent"
     except DuplicateSendError as exc:
         update_draft(draft_id, status="skipped", error=str(exc))
         flash(str(exc), "error")
+        return "duplicate"
     except Exception as exc:
         release_reservation(draft["email"], draft["address"])
         logger.exception("Send failed for %s", draft_id)
         update_draft(draft_id, status="failed", error=str(exc))
         flash(f"Send failed: {exc}", "error")
+        return "failed"
 
+
+@app.post("/drafts/<draft_id>/approve")
+@login_required
+def approve_draft(draft_id):
+    draft = get_draft(draft_id)
+    if not draft:
+        flash("Draft not found.", "error")
+        return redirect(url_for("dashboard"))
+
+    if draft["status"] != "pending":
+        flash(f"Draft is already {draft['status']}.", "error")
+        return redirect(url_for("dashboard"))
+
+    _send_draft_email(draft_id, draft)
     return redirect(url_for("dashboard", status="pending"))
+
+
+@app.post("/drafts/<draft_id>/send-anyway")
+@login_required
+def send_anyway_draft(draft_id):
+    draft = get_draft(draft_id)
+    if not draft:
+        flash("Draft not found.", "error")
+        return redirect(url_for("dashboard", status="rejected"))
+
+    return_to = request.form.get("return_to", "rejected")
+
+    if draft["status"] != "rejected":
+        flash(f"Only rejected drafts can be sent anyway (current: {draft['status']}).", "error")
+        return redirect(url_for("dashboard", status=draft["status"]))
+
+    result = _send_draft_email(draft_id, draft)
+    if result == "sent":
+        return redirect(url_for("dashboard", status="sent"))
+    if return_to == "detail":
+        return redirect(url_for("draft_detail", draft_id=draft_id))
+    return redirect(url_for("dashboard", status="rejected"))
 
 
 @app.post("/drafts/<draft_id>/reject")

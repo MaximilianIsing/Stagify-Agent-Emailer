@@ -1,10 +1,15 @@
 {% extends "base.html" %}
 {% block title %}Login — Stagify Email Admin{% endblock %}
 {% block body %}
-<main style="max-width:420px; margin-top:80px;">
-  <div class="card">
-    <h2 style="margin-top:0;">Stagify Email Admin</h2>
-    <p class="muted">Sign in with the contents of <code>key.txt</code>.</p>
+<main class="login-wrap">
+  <div class="card login-card">
+    <div class="login-brand">
+      <img class="brand-logo" src="{{ url_for('static', filename='logo.png') }}" alt="Stagify logo" />
+      <div>
+        <h2>Stagify Email Admin</h2>
+        <p class="muted login-sub">Sign in with the contents of <code>key.txt</code>.</p>
+      </div>
+    </div>
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% for category, message in messages %}
         <div class="flash {{ category }}">{{ message }}</div>
@@ -20,10 +25,40 @@
         <button type="button" class="btn password-toggle" id="toggle-password"
                 aria-label="Show password" title="Show or hide password">Show</button>
       </div>
-      <button class="btn btn-primary" type="submit" style="margin-top:12px;">Sign in</button>
+      <button class="btn btn-primary login-submit" type="submit">Sign in</button>
     </form>
   </div>
+  <p class="login-foot muted">Stagify · Virtual staging email automation</p>
 </main>
+<style>
+  .login-wrap {
+    max-width: 420px;
+    margin: 0 auto;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: center;
+    padding: 24px;
+  }
+  .login-card { padding: 28px 28px 26px; }
+  .login-brand {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 22px;
+  }
+  .login-brand h2 {
+    margin: 0;
+    font-size: 19px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  .login-brand .brand-logo { width: 46px; height: 46px; }
+  .login-sub { margin: 4px 0 0; }
+  .login-submit { width: 100%; margin-top: 14px; padding: 11px 16px; }
+  .login-foot { text-align: center; margin: 18px 0 0; font-size: 12px; }
+</style>
 <script>
   const input = document.getElementById("password");
   const toggle = document.getElementById("toggle-password");
