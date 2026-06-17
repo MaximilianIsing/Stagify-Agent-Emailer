@@ -50,6 +50,70 @@ def save_draft_meta(draft_id, meta):
     meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
 
 
+def _join_prompts(*parts):
+    return ". ".join(part.strip() for part in parts if part and str(part).strip())
+
+
+def restage_draft(draft_id, user_additional_prompt=""):
+    from email_engine import build_html_email, download_listing_image, stage_image
+
+    meta = get_draft(draft_id)
+    if not meta:
+        raise ValueError("Draft not found.")
+    if meta.get("status") != "rejected":
+        raise ValueError(
+            f"Only rejected drafts can be restaged (current status: {meta.get('status')})."
+        )
+
+    original_bytes, original_mime = get_original_image(draft_id)
+    if original_bytes is None:
+        downloaded = download_listing_image(meta["image_url"])
+        if not downloaded:
+            raise ValueError("Could not download listing image.")
+        original_bytes, original_mime, original_ext = downloaded
+        save_original_image(draft_id, original_bytes, original_mime)
+    else:
+        original_ext = _mime_to_ext(original_mime)
+
+    user_additional_prompt = (user_additional_prompt or "").strip()
+    combined_prompt = _join_prompts(
+        meta.get("additional_prompt", ""),
+        user_additional_prompt,
+    )
+
+    staged_data = stage_image(
+        meta["image_url"],
+        meta.get("room_type", "Living Room"),
+        meta.get("remove_furniture", False),
+        combined_prompt,
+        image_content=original_bytes,
+        image_mime=original_mime,
+        image_ext=original_ext,
+    )
+    if not staged_data:
+        raise ValueError("Staging failed. Try again or adjust your prompt.")
+
+    folder = draft_dir(draft_id)
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / "staged.txt").write_text(staged_data, encoding="utf-8")
+    html = build_html_email(
+        meta["name"],
+        meta["address"],
+        image_src=f"/drafts/{draft_id}/image",
+    )
+    (folder / "email.html").write_text(html, encoding="utf-8")
+
+    update_draft(
+        draft_id,
+        status="pending",
+        error=None,
+        last_restage_prompt=user_additional_prompt or None,
+        sent_at=None,
+        resend_id=None,
+    )
+    return get_draft(draft_id)
+
+
 def create_draft(row, staged_data, html_preview, original_bytes=None, original_mime=None):
     draft_id = draft_id_for_row(row)
     folder = draft_dir(draft_id)
@@ -74,6 +138,9 @@ def create_draft(row, staged_data, html_preview, original_bytes=None, original_m
         "subject": row["address"],
         "image_url": row["image_url"],
         "room_type": row["room_type"],
+        "remove_furniture": row.get("remove_furniture", False),
+        "additional_prompt": row.get("additional_prompt", ""),
+        "last_restage_prompt": None,
         "source_csv_id": row.get("source_csv_id"),
         "original_mime": original_mime,
         "created_at": _now(),

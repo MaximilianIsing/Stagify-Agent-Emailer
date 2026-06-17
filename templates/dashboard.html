@@ -179,6 +179,14 @@
                    alt="After" title="After staging" />
             </div>
             <a class="btn btn-muted" href="{{ url_for('draft_detail', draft_id=draft.id) }}">Preview</a>
+            {% if draft.status == 'rejected' %}
+            <button type="button" class="btn btn-primary btn-sm restage-open"
+                    data-draft-id="{{ draft.id }}"
+                    data-draft-name="{{ draft.name }}"
+                    data-draft-email="{{ draft.email }}">
+              Restage
+            </button>
+            {% endif %}
             {% if draft.status == 'pending' %}
             <form class="inline" method="post" action="{{ url_for('approve_draft', draft_id=draft.id) }}">
               <button class="btn btn-primary" type="submit"
@@ -229,6 +237,25 @@
     {% endif %}
   </div>
 </main>
+
+<div class="modal-overlay" id="restage-modal" hidden>
+  <div class="modal-card" role="dialog" aria-labelledby="restage-modal-title">
+    <h3 id="restage-modal-title">Restage draft</h3>
+    <p class="muted" id="restage-modal-subtitle"></p>
+    <form method="post" id="restage-form" action="">
+      <input type="hidden" name="return_to" value="rejected" />
+      <label for="restage-prompt">Additional staging prompt <span class="muted">(optional)</span></label>
+      <textarea id="restage-prompt" name="additional_prompt" rows="4"
+                placeholder="e.g. Use warmer lighting, add a modern sectional, remove clutter from the counter…"></textarea>
+      <p class="muted restage-note">This is added to the default modern staging prompt for a fresh render.</p>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-muted" id="restage-cancel">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="restage-submit">Restage</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script>
 (function () {
   var fileInput = document.getElementById('csv_file');
@@ -254,6 +281,44 @@
       }
     };
     reader.readAsText(file);
+  });
+})();
+
+(function () {
+  var modal = document.getElementById('restage-modal');
+  var form = document.getElementById('restage-form');
+  var prompt = document.getElementById('restage-prompt');
+  var subtitle = document.getElementById('restage-modal-subtitle');
+  var cancelBtn = document.getElementById('restage-cancel');
+  var submitBtn = document.getElementById('restage-submit');
+  if (!modal || !form) return;
+
+  function closeModal() {
+    modal.hidden = true;
+    prompt.value = '';
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Restage';
+  }
+
+  document.querySelectorAll('.restage-open').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var draftId = btn.dataset.draftId;
+      form.action = '/drafts/' + draftId + '/restage';
+      subtitle.textContent = 'Reprocess staging for ' + btn.dataset.draftName
+        + ' (' + btn.dataset.draftEmail + '). This may take up to a minute.';
+      modal.hidden = false;
+      prompt.focus();
+    });
+  });
+
+  cancelBtn.addEventListener('click', closeModal);
+  modal.addEventListener('click', function (e) {
+    if (e.target === modal) closeModal();
+  });
+
+  form.addEventListener('submit', function () {
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Restaging…';
   });
 })();
 </script>

@@ -36,6 +36,9 @@
     <form class="inline" method="post" action="{{ url_for('reject_draft', draft_id=draft.id) }}">
       <button class="btn btn-danger" type="submit">Reject</button>
     </form>
+    {% elif draft.status == 'rejected' %}
+    <button type="button" class="btn btn-primary" id="restage-detail-open">Restage</button>
+    <span class="badge {{ draft.status }}">{{ draft.status }}</span>
     {% else %}
     <span class="badge {{ draft.status }}">{{ draft.status }}</span>
     {% endif %}
@@ -45,5 +48,46 @@
     <iframe src="{{ url_for('draft_preview', draft_id=draft.id) }}"
             style="width:100%; height:900px; border:0;"></iframe>
   </div>
+
+  {% if draft.status == 'rejected' %}
+  <div class="modal-overlay" id="restage-modal" hidden>
+    <div class="modal-card" role="dialog" aria-labelledby="restage-modal-title">
+      <h3 id="restage-modal-title">Restage draft</h3>
+      <p class="muted">Reprocess staging for {{ draft.name }} ({{ draft.email }}). This may take up to a minute.</p>
+      <form method="post" action="{{ url_for('restage_draft_route', draft_id=draft.id) }}">
+        <input type="hidden" name="return_to" value="detail" />
+        <label for="restage-prompt">Additional staging prompt <span class="muted">(optional)</span></label>
+        <textarea id="restage-prompt" name="additional_prompt" rows="4"
+                  placeholder="e.g. Use warmer lighting, add a modern sectional…"></textarea>
+        <p class="muted restage-note">This is added to the default modern staging prompt for a fresh render.</p>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-muted" id="restage-cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="restage-submit">Restage</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  {% endif %}
 </main>
+{% if draft.status == 'rejected' %}
+<script>
+(function () {
+  var modal = document.getElementById('restage-modal');
+  var openBtn = document.getElementById('restage-detail-open');
+  var cancelBtn = document.getElementById('restage-cancel');
+  var submitBtn = document.getElementById('restage-submit');
+  if (!modal || !openBtn) return;
+
+  openBtn.addEventListener('click', function () { modal.hidden = false; });
+  cancelBtn.addEventListener('click', function () { modal.hidden = true; });
+  modal.addEventListener('click', function (e) {
+    if (e.target === modal) modal.hidden = true;
+  });
+  modal.querySelector('form').addEventListener('submit', function () {
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Restaging…';
+  });
+})();
+</script>
+{% endif %}
 {% endblock %}

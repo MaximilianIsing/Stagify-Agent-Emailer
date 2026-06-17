@@ -26,6 +26,7 @@ from draft_store import (
     get_staged_data,
     list_drafts,
     reject_all_pending,
+    restage_draft,
     save_original_image,
     update_draft,
 )
@@ -388,6 +389,39 @@ def reject_draft(draft_id):
     update_draft(draft_id, status="rejected", error=None)
     flash(f"Rejected draft for {draft['email']}.", "success")
     return redirect(url_for("dashboard", status="pending"))
+
+
+@app.post("/drafts/<draft_id>/restage")
+@login_required
+def restage_draft_route(draft_id):
+    draft = get_draft(draft_id)
+    if not draft:
+        flash("Draft not found.", "error")
+        return redirect(url_for("dashboard", status="rejected"))
+
+    if draft["status"] != "rejected":
+        flash(f"Only rejected drafts can be restaged (current: {draft['status']}).", "error")
+        return redirect(url_for("dashboard", status=draft["status"]))
+
+    additional_prompt = request.form.get("additional_prompt", "")
+    return_to = request.form.get("return_to", "rejected")
+
+    try:
+        restage_draft(draft_id, additional_prompt)
+        flash(
+            f"Restaged {draft['email']} — moved back to pending for review.",
+            "success",
+        )
+        return redirect(url_for("dashboard", status="pending"))
+    except ValueError as exc:
+        flash(str(exc), "error")
+    except Exception as exc:
+        logger.exception("Restage failed for %s", draft_id)
+        flash(f"Restage failed: {exc}", "error")
+
+    if return_to == "detail":
+        return redirect(url_for("draft_detail", draft_id=draft_id))
+    return redirect(url_for("dashboard", status="rejected"))
 
 
 @app.post("/drafts/reject-all")
