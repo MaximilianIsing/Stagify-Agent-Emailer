@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block title %}CSV History — Stagify Email Admin{% endblock %}
+{% block body %}
+{% include "_header.html" %}
+<main>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      <div class="flash {{ category }}">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  <div class="card">
+    <p class="muted" style="margin-top:0;">
+      All CSV uploads are listed here. Deleting one removes it from history and clears the duplicate lock so you can upload the same file again.
+    </p>
+
+    {% if csv_uploads %}
+    <table class="table-compact csv-table">
+      <thead>
+        <tr>
+          <th>File</th>
+          <th>Rows</th>
+          <th>Range</th>
+          <th>Uploaded</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for csv in csv_uploads %}
+        {% set total = csv.total_row_count or ((csv.valid_row_count or csv.row_count or 0) + (csv.skipped_row_count or 0)) %}
+        {% set valid = csv.valid_row_count or csv.row_count or 0 %}
+        {% set selected = csv.selected_row_count or valid %}
+        <tr>
+          <td class="csv-name">{{ csv.original_name }}</td>
+          <td class="csv-rows muted">
+            {{ total }} total · {{ valid }} valid · {{ selected }} run
+            {% if csv.skipped_row_count %}
+              · <a href="{{ url_for('csv_errors', csv_id=csv.id) }}">{{ csv.skipped_row_count }} skip</a>
+            {% endif %}
+          </td>
+          <td class="muted">{{ csv.row_range | format_row_range }}</td>
+          <td class="muted csv-date">{{ csv.uploaded_at[:16].replace('T', ' ') if csv.uploaded_at else '' }}</td>
+          <td>
+            {% if csv.active %}
+              <span class="badge sent">active</span>
+            {% else %}
+              <span class="badge rejected">inactive</span>
+            {% endif %}
+          </td>
+          <td class="csv-actions">
+            <button type="button" class="btn btn-danger btn-sm csv-purge-toggle"
+                    data-csv-id="{{ csv.id }}"
+                    data-csv-name="{{ csv.original_name }}">
+              Delete from history
+            </button>
+          </td>
+        </tr>
+        <tr class="csv-purge-row" id="purge-{{ csv.id }}" hidden>
+          <td colspan="6">
+            <div class="purge-warning">
+              <strong>Permanent deletion — this cannot be undone.</strong>
+              <p>
+                This will delete <strong>{{ csv.original_name }}</strong>, remove its upload record,
+                and allow the same CSV to be uploaded again. Existing drafts from this file are not deleted.
+              </p>
+              <form class="purge-form" method="post"
+                    action="{{ url_for('purge_csv', csv_id=csv.id) }}"
+                    data-expected-name="{{ csv.original_name }}"
+                    data-expected-phrase="{{ confirm_phrase }}">
+                <label>
+                  Type the exact filename to confirm
+                  <input type="text" name="confirm_name" class="purge-name" autocomplete="off"
+                         placeholder="{{ csv.original_name }}" />
+                </label>
+                <label>
+                  Type <code>{{ confirm_phrase }}</code> to confirm
+                  <input type="text" name="confirm_phrase" class="purge-phrase" autocomplete="off"
+                         placeholder="{{ confirm_phrase }}" />
+                </label>
+                <div class="purge-actions">
+                  <button type="button" class="btn btn-muted btn-sm csv-purge-cancel">Cancel</button>
+                  <button type="submit" class="btn btn-danger btn-sm purge-submit" disabled>
+                    Delete permanently
+                  </button>
+                </div>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+      <p class="muted csv-empty">No CSV uploads in history yet.</p>
+    {% endif %}
+  </div>
+</main>
+<script>
+(function () {
+  function updatePurgeButton(form) {
+    var name = (form.querySelector('.purge-name').value || '').trim();
+    var phrase = (form.querySelector('.purge-phrase').value || '').trim();
+    var ok = name === form.dataset.expectedName
+      && phrase === form.dataset.expectedPhrase;
+    form.querySelector('.purge-submit').disabled = !ok;
+  }
+
+  document.querySelectorAll('.csv-purge-toggle').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var id = btn.dataset.csvId;
+      document.querySelectorAll('.csv-purge-row').forEach(function (row) {
+        if (row.id !== 'purge-' + id) row.hidden = true;
+      });
+      var row = document.getElementById('purge-' + id);
+      row.hidden = !row.hidden;
+      if (!row.hidden) {
+        var input = row.querySelector('.purge-name');
+        input.focus();
+        input.select();
+      }
+    });
+  });
+
+  document.querySelectorAll('.csv-purge-cancel').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      btn.closest('.csv-purge-row').hidden = true;
+    });
+  });
+
+  document.querySelectorAll('.purge-form').forEach(function (form) {
+    form.querySelectorAll('.purge-name, .purge-phrase').forEach(function (input) {
+      input.addEventListener('input', function () { updatePurgeButton(form); });
+    });
+    form.addEventListener('submit', function (e) {
+      updatePurgeButton(form);
+      if (form.querySelector('.purge-submit').disabled) {
+        e.preventDefault();
+        alert('Type the exact filename and confirmation phrase to delete.');
+      }
+    });
+  });
+})();
+</script>
+{% endblock %}

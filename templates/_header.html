@@ -1,0 +1,17 @@
+<header>
+  <div class="header-brand">
+    <h1>{{ header_title or "STAGIFY EMAIL ADMIN" }}</h1>
+    <nav class="site-nav" aria-label="Main">
+      <a href="{{ url_for('dashboard') }}"
+         class="{% if active_nav == 'dashboard' %}active{% endif %}">Dashboard</a>
+      <a href="{{ url_for('csv_history') }}"
+         class="{% if active_nav == 'csvs' %}active{% endif %}">CSV History</a>
+    </nav>
+  </div>
+  <div class="header-actions">
+    {% if header_extra %}{{ header_extra|safe }}{% endif %}
+    <form method="post" action="{{ url_for('logout') }}">
+      <button class="btn btn-muted" type="submit">Log out</button>
+    </form>
+  </div>
+</header>

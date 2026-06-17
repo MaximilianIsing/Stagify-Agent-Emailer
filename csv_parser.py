@@ -114,6 +114,7 @@ def validate_csv_row(line_num, row):
 def parse_csv_file(csv_path, source_csv_id=None):
     rows = []
     skipped = []
+    total_data_rows = 0
     path = Path(csv_path)
 
     try:
@@ -123,6 +124,7 @@ def parse_csv_file(csv_path, source_csv_id=None):
             "rows": [],
             "skipped": [{"line": 0, "reason": f"Could not read file: {exc}", "preview": ""}],
             "source_csv_id": source_csv_id,
+            "total_row_count": 0,
         }
 
     with handle as f:
@@ -133,6 +135,7 @@ def parse_csv_file(csv_path, source_csv_id=None):
                 "rows": [],
                 "skipped": [{"line": 0, "reason": f"Invalid CSV format: {exc}", "preview": ""}],
                 "source_csv_id": source_csv_id,
+                "total_row_count": 0,
             }
 
         if not reader.fieldnames:
@@ -140,6 +143,7 @@ def parse_csv_file(csv_path, source_csv_id=None):
                 "rows": [],
                 "skipped": [{"line": 0, "reason": "CSV is empty or has no header row", "preview": ""}],
                 "source_csv_id": source_csv_id,
+                "total_row_count": 0,
             }
 
         missing = [col for col in REQUIRED_COLUMNS if col not in reader.fieldnames]
@@ -152,9 +156,11 @@ def parse_csv_file(csv_path, source_csv_id=None):
                     "preview": "",
                 }],
                 "source_csv_id": source_csv_id,
+                "total_row_count": 0,
             }
 
         for line_num, row in enumerate(reader, start=2):
+            total_data_rows += 1
             try:
                 parsed, err = validate_csv_row(line_num, row)
             except Exception as exc:
@@ -182,7 +188,12 @@ def parse_csv_file(csv_path, source_csv_id=None):
                 parsed["row_index"] = len(rows) + 1
                 rows.append(parsed)
 
-    return {"rows": rows, "skipped": skipped, "source_csv_id": source_csv_id}
+    return {
+        "rows": rows,
+        "skipped": skipped,
+        "source_csv_id": source_csv_id,
+        "total_row_count": total_data_rows,
+    }
 
 
 def parse_csv(csv_path=None, include_skipped=False):

@@ -52,6 +52,8 @@ app = Flask(__name__)
 app.config["TEMPLATES_AUTO_RELOAD"] = True
 app.jinja_env.filters["format_row_range"] = format_row_range
 
+CSV_PURGE_CONFIRM_PHRASE = "DELETE PERMANENTLY"
+
 
 def _app_config():
     return load_config()
@@ -112,6 +114,7 @@ def dashboard():
         status_filter=status_filter,
         debug_settings=load_debug_settings(),
         csv_uploads=list_csvs(),
+        active_nav="dashboard",
     )
 
 
@@ -145,7 +148,9 @@ def upload_csv():
         )
         msg = (
             f"Uploaded {entry['original_name']} — "
-            f"{entry['selected_row_count']} of {entry['valid_row_count']} valid row(s) selected"
+            f"{entry['total_row_count']} row(s) in file, "
+            f"{entry['valid_row_count']} valid, "
+            f"{entry['selected_row_count']} selected"
         )
         if entry.get("skipped_row_count"):
             msg += f", {entry['skipped_row_count']} skipped (see errors)"
@@ -182,12 +187,56 @@ def remove_csv(csv_id):
     if not entry:
         flash("CSV not found.", "error")
         return redirect(url_for("dashboard"))
+    flash(
+        f"Use CSV History to delete {entry['original_name']} — "
+        "deletion requires full confirmation.",
+        "error",
+    )
+    return redirect(url_for("csv_history"))
+
+
+@app.route("/csvs/history")
+@login_required
+def csv_history():
+    return render_template(
+        "csv_history.html",
+        csv_uploads=list_csvs(),
+        active_nav="csvs",
+        confirm_phrase=CSV_PURGE_CONFIRM_PHRASE,
+    )
+
+
+@app.post("/csvs/<csv_id>/purge")
+@login_required
+def purge_csv(csv_id):
+    entry = get_csv(csv_id)
+    if not entry:
+        flash("CSV not found.", "error")
+        return redirect(url_for("csv_history"))
+
+    confirm_name = request.form.get("confirm_name", "").strip()
+    confirm_phrase = request.form.get("confirm_phrase", "").strip()
+
+    if confirm_phrase != CSV_PURGE_CONFIRM_PHRASE:
+        flash(
+            f'Confirmation phrase incorrect. Type "{CSV_PURGE_CONFIRM_PHRASE}" exactly.',
+            "error",
+        )
+        return redirect(url_for("csv_history"))
+
+    if confirm_name != entry["original_name"]:
+        flash("Filename does not match. Type the exact filename to confirm.", "error")
+        return redirect(url_for("csv_history"))
+
     try:
         delete_csv(csv_id)
-        flash(f"Deleted {entry['original_name']}.", "success")
+        flash(
+            f'Removed "{entry["original_name"]}" from history. You may upload it again.',
+            "success",
+        )
     except ValueError as exc:
         flash(str(exc), "error")
-    return redirect(url_for("dashboard", status=request.form.get("status", "pending")))
+    return redirect(url_for("csv_history"))
 
 
 @app.route("/csvs/<csv_id>/errors")
@@ -204,6 +253,7 @@ def csv_errors(csv_id):
         csv_entry=entry,
         skipped=report.get("skipped", []),
         valid_count=len(report.get("rows", [])),
+        active_nav="csvs",
     )
 
 

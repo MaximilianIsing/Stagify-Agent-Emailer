@@ -73,6 +73,20 @@ def _check_duplicate_upload(content_hash):
     )
 
 
+def _remove_upload_hash_for_csv(csv_id, content_hash=None):
+    registry = _load_hash_registry()
+    changed = False
+    if content_hash and content_hash in registry:
+        del registry[content_hash]
+        changed = True
+    for key, meta in list(registry.items()):
+        if meta.get("csv_id") == csv_id and key in registry:
+            del registry[key]
+            changed = True
+    if changed:
+        _save_hash_registry(registry)
+
+
 def _record_upload_hash(content_hash, csv_id, original_name):
     registry = _load_hash_registry()
     registry[content_hash] = {
@@ -182,6 +196,7 @@ def save_upload(
         if not result["rows"]:
             raise ValueError(_format_upload_error(result))
         total_valid = len(result["rows"])
+        total_rows = result.get("total_row_count", total_valid + len(result["skipped"]))
         row_range = parse_row_range_params(
             row_start,
             row_end,
@@ -201,6 +216,7 @@ def save_upload(
         "content_hash": content_hash,
         "uploaded_at": _now(),
         "row_count": total_valid,
+        "total_row_count": total_rows,
         "valid_row_count": total_valid,
         "selected_row_count": row_range["selected_row_count"],
         "row_range": row_range,
@@ -229,14 +245,15 @@ def set_csv_active(csv_id, active):
 def delete_csv(csv_id):
     registry = _load_registry()
     kept = []
-    deleted = False
+    deleted_entry = None
     for entry in registry:
         if entry["id"] == csv_id:
+            deleted_entry = entry
             Path(entry["stored_path"]).unlink(missing_ok=True)
             _delete_parse_report(csv_id)
-            deleted = True
         else:
             kept.append(entry)
-    if not deleted:
+    if not deleted_entry:
         raise ValueError("CSV not found.")
     _save_registry(kept)
+    _remove_upload_hash_for_csv(csv_id, deleted_entry.get("content_hash"))
