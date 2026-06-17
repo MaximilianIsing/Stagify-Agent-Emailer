@@ -16,7 +16,7 @@ from flask import (
 
 from config import DATA_DIR, load_config, normalize_password
 from csv_store import delete_csv, get_csv, get_parse_report, list_csvs, reconcile_csv_registry, save_upload, set_csv_active
-from debug_settings import load_debug_settings, save_debug_settings
+from debug_settings import load_debug_settings, save_debug_settings, tracking_email_for_send
 from row_range import format_row_range
 from draft_store import (
     DISCARDABLE_STATUSES,
@@ -323,7 +323,11 @@ def _send_draft_email(draft_id, draft):
         flash("Staged image missing.", "error")
         return "missing_staged"
 
-    html = build_html_email(draft["name"], draft["address"], email=draft["email"])
+    html = build_html_email(
+        draft["name"],
+        draft["address"],
+        email=tracking_email_for_send(draft["email"]),
+    )
     debug_settings = load_debug_settings()
 
     try:

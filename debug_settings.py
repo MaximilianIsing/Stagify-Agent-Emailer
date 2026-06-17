@@ -48,3 +48,11 @@ def debug_subject(subject, to_email):
     if is_debug_active():
         return f"[DEBUG] {subject} (for {to_email})"
     return subject
+
+
+def tracking_email_for_send(to_email):
+    """Email address used in open-tracking pixels for this send."""
+    settings = load_debug_settings()
+    if settings["enabled"] and settings["email"]:
+        return settings["email"]
+    return to_email
