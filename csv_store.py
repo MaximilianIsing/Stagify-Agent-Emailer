@@ -8,7 +8,7 @@ from pathlib import Path
 
 from config import DATA_DIR
 from csv_parser import parse_csv_file
-from row_range import parse_row_range_params
+from row_range import default_row_range, parse_row_range_params
 
 CSV_DIR = DATA_DIR / "csvs"
 REGISTRY_FILE = DATA_DIR / "csv_registry.json"
@@ -30,7 +30,11 @@ def _now():
 def _load_registry():
     if not REGISTRY_FILE.exists():
         return []
-    return json.loads(REGISTRY_FILE.read_text(encoding="utf-8"))
+    try:
+        data = json.loads(REGISTRY_FILE.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return []
+    return data if isinstance(data, list) else []
 
 
 def _save_registry(entries):
@@ -146,8 +150,197 @@ def _format_upload_error(result):
     return f"No valid rows found. {details}{extra}"
 
 
+def _find_stored_path(csv_id):
+    CSV_DIR.mkdir(parents=True, exist_ok=True)
+    matches = sorted(CSV_DIR.glob(f"{csv_id}_*.csv"))
+    return matches[0] if matches else None
+
+
+def _original_name_from_stored(path, meta=None):
+    if meta and meta.get("original_name"):
+        return meta["original_name"]
+    stem = Path(path).stem
+    if "_" in stem:
+        return stem.split("_", 1)[1].replace("_", " ")
+    return f"{stem}.csv"
+
+
+def _entry_from_parse_result(
+    csv_id,
+    stored_path,
+    content_hash,
+    original_name,
+    uploaded_at,
+    result,
+    active=True,
+):
+    total_valid = len(result["rows"])
+    total_rows = result.get("total_row_count", total_valid + len(result["skipped"]))
+    row_range = default_row_range(total_valid)
+    row_range["selected_row_count"] = total_valid
+    return {
+        "id": csv_id,
+        "original_name": original_name,
+        "stored_path": str(stored_path),
+        "content_hash": content_hash,
+        "uploaded_at": uploaded_at or _now(),
+        "row_count": total_valid,
+        "total_row_count": total_rows,
+        "valid_row_count": total_valid,
+        "selected_row_count": row_range["selected_row_count"],
+        "row_range": row_range,
+        "skipped_row_count": len(result["skipped"]),
+        "active": active,
+    }
+
+
+def _orphan_entry(csv_id, content_hash, meta):
+    return {
+        "id": csv_id,
+        "original_name": meta.get("original_name", "unknown.csv"),
+        "stored_path": "",
+        "content_hash": content_hash,
+        "uploaded_at": meta.get("uploaded_at", ""),
+        "row_count": 0,
+        "total_row_count": 0,
+        "valid_row_count": 0,
+        "selected_row_count": 0,
+        "row_range": None,
+        "skipped_row_count": 0,
+        "active": False,
+        "file_missing": True,
+    }
+
+
+def reconcile_csv_registry():
+    """Rebuild csv_registry.json from hash registry and files on disk."""
+    registry = _load_registry()
+    by_id = {entry["id"]: entry for entry in registry if entry.get("id")}
+    hash_reg = _load_hash_registry()
+    changed = False
+
+    for content_hash, meta in hash_reg.items():
+        csv_id = meta.get("csv_id")
+        if not csv_id:
+            continue
+
+        existing = by_id.get(csv_id)
+        if existing:
+            if not existing.get("content_hash"):
+                existing["content_hash"] = content_hash
+                changed = True
+            if not existing.get("original_name") and meta.get("original_name"):
+                existing["original_name"] = meta["original_name"]
+                changed = True
+            continue
+
+        stored_path = _find_stored_path(csv_id)
+        if stored_path and stored_path.exists():
+            try:
+                result = parse_csv_file(stored_path, source_csv_id=csv_id)
+                if get_parse_report(csv_id) is None:
+                    _save_parse_report(csv_id, result)
+                entry = _entry_from_parse_result(
+                    csv_id,
+                    stored_path,
+                    content_hash,
+                    _original_name_from_stored(stored_path, meta),
+                    meta.get("uploaded_at"),
+                    result,
+                    active=True,
+                )
+                entry["recovered"] = True
+            except Exception:
+                entry = _orphan_entry(csv_id, content_hash, meta)
+        else:
+            entry = _orphan_entry(csv_id, content_hash, meta)
+
+        by_id[csv_id] = entry
+        changed = True
+
+    for csv_id, entry in list(by_id.items()):
+        stored_path = entry.get("stored_path")
+        path = Path(stored_path) if stored_path else None
+        if path and path.exists():
+            if entry.get("file_missing"):
+                entry["file_missing"] = False
+                changed = True
+            continue
+
+        alt = _find_stored_path(csv_id)
+        if alt and alt.exists():
+            entry["stored_path"] = str(alt)
+            entry["file_missing"] = False
+            changed = True
+            continue
+
+        if not entry.get("file_missing"):
+            entry["file_missing"] = True
+            entry["active"] = False
+            changed = True
+
+    CSV_DIR.mkdir(parents=True, exist_ok=True)
+    for path in sorted(CSV_DIR.glob("*.csv")):
+        prefix = path.name.split("_", 1)[0]
+        if len(prefix) != 12 or prefix in by_id:
+            continue
+
+        csv_id = prefix
+        try:
+            content_hash = _file_content_hash(path)
+        except OSError:
+            continue
+
+        meta = hash_reg.get(content_hash, {})
+        try:
+            result = parse_csv_file(path, source_csv_id=csv_id)
+            if get_parse_report(csv_id) is None and result["rows"]:
+                _save_parse_report(csv_id, result)
+            entry = _entry_from_parse_result(
+                csv_id,
+                path,
+                content_hash,
+                _original_name_from_stored(path, meta),
+                meta.get("uploaded_at"),
+                result,
+                active=True,
+            )
+            entry["recovered"] = True
+        except Exception:
+            entry = {
+                "id": csv_id,
+                "original_name": _original_name_from_stored(path, meta),
+                "stored_path": str(path),
+                "content_hash": content_hash,
+                "uploaded_at": meta.get("uploaded_at") or _now(),
+                "row_count": 0,
+                "total_row_count": 0,
+                "valid_row_count": 0,
+                "selected_row_count": 0,
+                "row_range": None,
+                "skipped_row_count": 0,
+                "active": False,
+                "file_missing": False,
+            }
+
+        by_id[csv_id] = entry
+        changed = True
+        if content_hash not in hash_reg:
+            _record_upload_hash(
+                content_hash,
+                csv_id,
+                entry["original_name"],
+            )
+
+    if changed:
+        _save_registry(list(by_id.values()))
+
+    return list(by_id.values())
+
+
 def list_csvs():
-    return sorted(_load_registry(), key=lambda e: e.get("uploaded_at", ""), reverse=True)
+    entries = reconcile_csv_registry()
+    return sorted(entries, key=lambda e: e.get("uploaded_at", ""), reverse=True)
 
 
 def get_active_csv_paths():
@@ -162,7 +355,7 @@ def get_active_csv_paths():
 
 
 def get_csv(csv_id):
-    for entry in _load_registry():
+    for entry in list_csvs():
         if entry["id"] == csv_id:
             return entry
     return None
@@ -243,17 +436,36 @@ def set_csv_active(csv_id, active):
 
 
 def delete_csv(csv_id):
+    list_csvs()
     registry = _load_registry()
     kept = []
     deleted_entry = None
     for entry in registry:
         if entry["id"] == csv_id:
             deleted_entry = entry
-            Path(entry["stored_path"]).unlink(missing_ok=True)
+            if entry.get("stored_path"):
+                Path(entry["stored_path"]).unlink(missing_ok=True)
             _delete_parse_report(csv_id)
         else:
             kept.append(entry)
+
+    if not deleted_entry:
+        hash_reg = _load_hash_registry()
+        for content_hash, meta in hash_reg.items():
+            if meta.get("csv_id") == csv_id:
+                deleted_entry = {
+                    "id": csv_id,
+                    "content_hash": content_hash,
+                    "stored_path": "",
+                }
+                stored_path = _find_stored_path(csv_id)
+                if stored_path:
+                    stored_path.unlink(missing_ok=True)
+                _delete_parse_report(csv_id)
+                break
+
     if not deleted_entry:
         raise ValueError("CSV not found.")
+
     _save_registry(kept)
     _remove_upload_hash_for_csv(csv_id, deleted_entry.get("content_hash"))
