@@ -5,7 +5,9 @@ from pathlib import Path
 from config import DRAFTS_DIR
 from email_engine import draft_id_for_row
 
-VALID_STATUSES = {"pending", "rejected", "sent", "failed", "skipped"}
+VALID_STATUSES = {"pending", "rejected", "sent", "failed", "skipped", "discarded"}
+RESTAGEABLE_STATUSES = frozenset({"rejected", "failed"})
+DISCARDABLE_STATUSES = frozenset({"rejected", "failed"})
 
 
 def _now():
@@ -60,9 +62,10 @@ def restage_draft(draft_id, user_additional_prompt=""):
     meta = get_draft(draft_id)
     if not meta:
         raise ValueError("Draft not found.")
-    if meta.get("status") != "rejected":
+    if meta.get("status") not in RESTAGEABLE_STATUSES:
         raise ValueError(
-            f"Only rejected drafts can be restaged (current status: {meta.get('status')})."
+            f"Only rejected or failed drafts can be restaged "
+            f"(current status: {meta.get('status')})."
         )
 
     original_bytes, original_mime = get_original_image(draft_id)
@@ -258,14 +261,35 @@ def reject_all_pending():
     return count
 
 
-def restage_all_rejected():
-    rejected = list_drafts(status="rejected")
+def discard_draft(draft_id):
+    meta = get_draft(draft_id)
+    if not meta:
+        raise ValueError("Draft not found.")
+    if meta.get("status") not in DISCARDABLE_STATUSES:
+        raise ValueError(
+            f"Only rejected or failed drafts can be discarded "
+            f"(current status: {meta.get('status')})."
+        )
+    update_draft(draft_id, status="discarded", error=None, discarded_at=_now())
+    return get_draft(draft_id)
+
+
+def restage_all_with_status(*statuses):
+    targets = [draft for draft in list_drafts() if draft.get("status") in statuses]
     restaged = 0
     failed = []
-    for draft in rejected:
+    for draft in targets:
         try:
             restage_draft(draft["id"], "")
             restaged += 1
         except Exception as exc:
             failed.append((draft.get("email", draft["id"]), str(exc)))
     return restaged, failed
+
+
+def restage_all_rejected():
+    return restage_all_with_status("rejected")
+
+
+def restage_all_failed():
+    return restage_all_with_status("failed")
