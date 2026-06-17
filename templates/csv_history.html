@@ -32,11 +32,22 @@
         {% set valid = csv.valid_row_count or csv.row_count or 0 %}
         {% set selected = csv.selected_row_count or valid %}
         <tr>
-          <td class="csv-name">{{ csv.original_name }}</td>
+          <td class="csv-name">
+            {{ csv.original_name }}
+            {% if csv.file_missing %}
+              <span class="badge failed">file missing</span>
+            {% elif csv.recovered %}
+              <span class="badge pending">recovered</span>
+            {% endif %}
+          </td>
           <td class="csv-rows muted">
+            {% if csv.file_missing %}
+              —
+            {% else %}
             {{ total }} total · {{ valid }} valid · {{ selected }} run
             {% if csv.skipped_row_count %}
               · <a href="{{ url_for('csv_errors', csv_id=csv.id) }}">{{ csv.skipped_row_count }} skip</a>
+            {% endif %}
             {% endif %}
           </td>
           <td class="muted">{{ csv.row_range | format_row_range }}</td>

@@ -15,7 +15,7 @@ from flask import (
 )
 
 from config import DATA_DIR, load_config, normalize_password
-from csv_store import delete_csv, get_csv, get_parse_report, list_csvs, save_upload, set_csv_active
+from csv_store import delete_csv, get_csv, get_parse_report, list_csvs, reconcile_csv_registry, save_upload, set_csv_active
 from debug_settings import load_debug_settings, save_debug_settings
 from row_range import format_row_range
 from draft_store import (
@@ -403,6 +403,7 @@ def reject_all_drafts():
 
 def create_app():
     DATA_DIR.mkdir(parents=True, exist_ok=True)
+    reconcile_csv_registry()
     start_worker()
     return app
 
