@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 from urllib.parse import quote
 
-from debug_settings import debug_subject, is_debug_active, load_debug_settings, resolve_recipients
+from debug_settings import debug_subject, is_debug_active, load_debug_settings, resolve_recipients, tracking_email_for_send
 from csv_parser import parse_csv as engine_parse_csv
 
 SCRIPT_DIR = Path(__file__).parent
@@ -487,7 +487,11 @@ def main():
             skipped += 1
             continue
 
-        html = build_html_email(row["name"], row["address"], row["email"])
+        html = build_html_email(
+            row["name"],
+            row["address"],
+            tracking_email_for_send(row["email"]),
+        )
         subject = row["address"]
         recipients, _ = resolve_recipients(row["email"])
         target = recipients[0]
