@@ -17,6 +17,7 @@ from flask import (
 from config import DATA_DIR, load_config, normalize_password
 from csv_store import delete_csv, get_csv, get_parse_report, list_csvs, save_upload, set_csv_active
 from debug_settings import load_debug_settings, save_debug_settings
+from row_range import format_row_range
 from draft_store import (
     count_by_status,
     get_draft,
@@ -24,6 +25,7 @@ from draft_store import (
     get_original_image,
     get_staged_data,
     list_drafts,
+    reject_all_pending,
     save_original_image,
     update_draft,
 )
@@ -48,6 +50,7 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.config["TEMPLATES_AUTO_RELOAD"] = True
+app.jinja_env.filters["format_row_range"] = format_row_range
 
 
 def _app_config():
@@ -133,10 +136,16 @@ def update_debug_settings():
 def upload_csv():
     file = request.files.get("csv_file")
     try:
-        entry = save_upload(file)
+        entry = save_upload(
+            file,
+            row_start=request.form.get("row_start", ""),
+            row_end=request.form.get("row_end", ""),
+            row_start_bound=request.form.get("row_start_bound", "inclusive"),
+            row_end_bound=request.form.get("row_end_bound", "inclusive"),
+        )
         msg = (
             f"Uploaded {entry['original_name']} — "
-            f"{entry['valid_row_count']} valid row(s)"
+            f"{entry['selected_row_count']} of {entry['valid_row_count']} valid row(s) selected"
         )
         if entry.get("skipped_row_count"):
             msg += f", {entry['skipped_row_count']} skipped (see errors)"
@@ -328,6 +337,17 @@ def reject_draft(draft_id):
 
     update_draft(draft_id, status="rejected", error=None)
     flash(f"Rejected draft for {draft['email']}.", "success")
+    return redirect(url_for("dashboard", status="pending"))
+
+
+@app.post("/drafts/reject-all")
+@login_required
+def reject_all_drafts():
+    count = reject_all_pending()
+    if count:
+        flash(f"Rejected {count} pending draft(s).", "success")
+    else:
+        flash("No pending drafts to reject.", "error")
     return redirect(url_for("dashboard", status="pending"))
 
 

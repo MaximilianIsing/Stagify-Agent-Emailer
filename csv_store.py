@@ -8,6 +8,7 @@ from pathlib import Path
 
 from config import DATA_DIR
 from csv_parser import parse_csv_file
+from row_range import parse_row_range_params
 
 CSV_DIR = DATA_DIR / "csvs"
 REGISTRY_FILE = DATA_DIR / "csv_registry.json"
@@ -153,7 +154,13 @@ def get_csv(csv_id):
     return None
 
 
-def save_upload(file_storage):
+def save_upload(
+    file_storage,
+    row_start="",
+    row_end="",
+    row_start_bound="inclusive",
+    row_end_bound="inclusive",
+):
     if not file_storage or not file_storage.filename:
         raise ValueError("No file selected.")
 
@@ -174,6 +181,14 @@ def save_upload(file_storage):
         result = parse_csv_file(stored_path, source_csv_id=csv_id)
         if not result["rows"]:
             raise ValueError(_format_upload_error(result))
+        total_valid = len(result["rows"])
+        row_range = parse_row_range_params(
+            row_start,
+            row_end,
+            row_start_bound,
+            row_end_bound,
+            total_valid,
+        )
         _save_parse_report(csv_id, result)
     except Exception:
         stored_path.unlink(missing_ok=True)
@@ -185,8 +200,10 @@ def save_upload(file_storage):
         "stored_path": str(stored_path),
         "content_hash": content_hash,
         "uploaded_at": _now(),
-        "row_count": len(result["rows"]),
-        "valid_row_count": len(result["rows"]),
+        "row_count": total_valid,
+        "valid_row_count": total_valid,
+        "selected_row_count": row_range["selected_row_count"],
+        "row_range": row_range,
         "skipped_row_count": len(result["skipped"]),
         "active": True,
     }
