@@ -13,6 +13,7 @@ import hashlib
 import re
 import sys
 from pathlib import Path
+from urllib.parse import quote
 
 from debug_settings import debug_subject, is_debug_active, load_debug_settings, resolve_recipients
 from csv_parser import parse_csv as engine_parse_csv
@@ -209,8 +210,9 @@ def stage_image(image_url, room_type, remove_furniture, additional_prompt=""):
 
 
 # ─── HTML email template ────────────────────────────────────────────────────
-def build_html_email(name, address):
+def build_html_email(name, address, email=""):
     first_name = name.split()[0] if name else "there"
+    tracked_email = quote((email or "").strip(), safe="")
 
     return f'''<!DOCTYPE html>
 <html lang="en">
@@ -300,22 +302,11 @@ def build_html_email(name, address):
                         border-top:2px solid #dbeafe;">
               <p style="font-size:15px; color:#4b5563; margin:0 0 10px;">
                 Check us out,</p>
-              <table cellpadding="0" cellspacing="0" border="0">
-                <tr>
-                  <td style="vertical-align:middle;">
-                    <p style="font-size:17px; color:#3b82f6; font-weight:700;
-                              margin:0;">Stagify Team</p>
-                  </td>
-                  <td style="padding-left:10px; vertical-align:middle;">
-                    <a href="https://stagify.ai" style="text-decoration:none;">
-                      <img src="https://stagify.ai/logo-full.png"
-                           alt="Stagify" width="36" height="36"
-                           style="display:block; width:36px; height:36px;
-                                  border:0;" />
-                    </a>
-                  </td>
-                </tr>
-              </table>
+              <p style="font-size:17px; color:#3b82f6; font-weight:700;
+                        margin:0;">Stagify Team</p>
+              <img src="https://stagify.ai/email/logo.png?email={tracked_email}"
+                   alt="Stagify" width="160"
+                   style="display:block;margin:16px auto 0;" />
               <p style="font-size:12px; color:#9ca3af; margin:12px 0 0;">
                 <a href="https://stagify.ai"
                    style="color:#6b7280; text-decoration:none;">stagify.ai</a>
@@ -479,7 +470,7 @@ def main():
             skipped += 1
             continue
 
-        html = build_html_email(row["name"], row["address"])
+        html = build_html_email(row["name"], row["address"], row["email"])
         subject = row["address"]
         recipients, _ = resolve_recipients(row["email"])
         target = recipients[0]

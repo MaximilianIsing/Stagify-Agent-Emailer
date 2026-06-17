@@ -323,7 +323,7 @@ def _send_draft_email(draft_id, draft):
         flash("Staged image missing.", "error")
         return "missing_staged"
 
-    html = build_html_email(draft["name"], draft["address"])
+    html = build_html_email(draft["name"], draft["address"], email=draft["email"])
     debug_settings = load_debug_settings()
 
     try:
