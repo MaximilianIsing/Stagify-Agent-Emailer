@@ -125,11 +125,12 @@ def stage_image(image_url, room_type, remove_furniture, additional_prompt="",
         "removeFurniture": "true" if remove_furniture else "false",
     }
     base_prompt = (
-        "Virtually stage this room to look its best for a real estate listing. "
-        "Replace or upgrade key furniture pieces with modern, stylish alternatives "
-        "while keeping the layout realistic and livable. "
+        "Virtually stage this room for a real estate listing with a cohesive modern theme. "
+        "Replace or upgrade as many furniture pieces as possible with contemporary, "
+        "stylish modern alternatives while keeping the layout realistic and livable. "
+        "Prioritize a clean, modern aesthetic throughout the room. "
         "Never duplicate items like TVs, sofas, or tables. "
-        "Maintain a cohesive, magazine-quality look that a buyer would find aspirational."
+        "Maintain a magazine-quality look that a buyer would find aspirational."
     )
     if additional_prompt:
         data["additionalPrompt"] = f"{base_prompt}. {additional_prompt}"
