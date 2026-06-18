@@ -16,7 +16,13 @@ def _atomic_write(path, data):
 def load_debug_settings():
     if not SETTINGS_FILE.exists():
         return dict(DEFAULT_SETTINGS)
-    data = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
+    try:
+        text = SETTINGS_FILE.read_text(encoding="utf-8").strip()
+        if not text:
+            return dict(DEFAULT_SETTINGS)
+        data = json.loads(text)
+    except (json.JSONDecodeError, OSError):
+        return dict(DEFAULT_SETTINGS)
     return {
         "enabled": bool(data.get("enabled", False)),
         "email": (data.get("email") or "").strip(),

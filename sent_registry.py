@@ -31,7 +31,19 @@ def _atomic_write(path, data):
 def _load_unlocked():
     if not SENT_REGISTRY_FILE.exists():
         return _empty_registry()
-    return json.loads(SENT_REGISTRY_FILE.read_text(encoding="utf-8"))
+    try:
+        text = SENT_REGISTRY_FILE.read_text(encoding="utf-8").strip()
+        if not text:
+            return _empty_registry()
+        data = json.loads(text)
+        if not isinstance(data, dict):
+            return _empty_registry()
+        data.setdefault("version", 1)
+        data.setdefault("by_email", {})
+        data.setdefault("by_dedup_key", {})
+        return data
+    except (json.JSONDecodeError, OSError):
+        return _empty_registry()
 
 
 def load_registry():
