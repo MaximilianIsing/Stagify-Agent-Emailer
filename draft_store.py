@@ -31,7 +31,10 @@ def list_drafts(status=None):
         meta_path = path / "meta.json"
         if not meta_path.exists():
             continue
-        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        try:
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
         if status is None or meta.get("status") == status:
             drafts.append(meta)
     drafts.sort(key=lambda d: d.get("created_at", ""), reverse=True)
@@ -42,7 +45,10 @@ def get_draft(draft_id):
     meta_path = draft_dir(draft_id) / "meta.json"
     if not meta_path.exists():
         return None
-    return json.loads(meta_path.read_text(encoding="utf-8"))
+    try:
+        return json.loads(meta_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
 
 
 def save_draft_meta(draft_id, meta):

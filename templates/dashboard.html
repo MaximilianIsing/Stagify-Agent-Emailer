@@ -195,12 +195,6 @@
           <td><span class="badge {{ draft.status }}">{{ draft.status }}</span></td>
           <td class="muted">{{ draft.created_at[:19] if draft.created_at else '' }}</td>
           <td>
-            <div class="thumb-pair">
-              <img src="{{ url_for('draft_original_image', draft_id=draft.id) }}"
-                   alt="Before" title="Before" />
-              <img src="{{ url_for('draft_image', draft_id=draft.id) }}"
-                   alt="After" title="After staging" />
-            </div>
             <div class="row-actions">
               <a class="btn btn-muted btn-sm" href="{{ url_for('draft_detail', draft_id=draft.id) }}">Preview</a>
               {% if draft.status == 'rejected' %}
