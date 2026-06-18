@@ -83,7 +83,11 @@ def validate_csv_row(line_num, row):
     if not any((name, email, address, image_url, staged_flag, image_type)):
         return None, None
 
-    if not name or name.startswith("-"):
+    if not name:
+        return None, "Missing or invalid name"
+    if "---" in name:
+        return None, "Invalid name (contains ---)"
+    if name.startswith("-"):
         return None, "Missing or invalid name"
     if not email:
         return None, "Missing email address"
