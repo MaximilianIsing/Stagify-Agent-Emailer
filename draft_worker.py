@@ -26,15 +26,40 @@ def _now():
     return datetime.now(timezone.utc).isoformat()
 
 
+def _default_worker_state():
+    return {"last_run": None, "last_error": None, "drafts_created": 0}
+
+
 def _load_worker_state():
     if not WORKER_STATE_FILE.exists():
-        return {"last_run": None, "last_error": None, "drafts_created": 0}
-    return json.loads(WORKER_STATE_FILE.read_text(encoding="utf-8"))
+        return _default_worker_state()
+    try:
+        text = WORKER_STATE_FILE.read_text(encoding="utf-8").strip()
+        if not text:
+            return _default_worker_state()
+        data = json.loads(text)
+        if not isinstance(data, dict):
+            return _default_worker_state()
+        return {
+            "last_run": data.get("last_run"),
+            "last_error": data.get("last_error"),
+            "drafts_created": data.get("drafts_created", 0),
+        }
+    except (json.JSONDecodeError, OSError) as exc:
+        logger.warning("Resetting corrupt worker state file: %s", exc)
+        return _default_worker_state()
 
 
 def _save_worker_state(state):
     WORKER_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    WORKER_STATE_FILE.write_text(json.dumps(state, indent=2), encoding="utf-8")
+    payload = {
+        "last_run": state.get("last_run"),
+        "last_error": state.get("last_error"),
+        "drafts_created": state.get("drafts_created", 0),
+    }
+    tmp = WORKER_STATE_FILE.with_suffix(".tmp")
+    tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    tmp.replace(WORKER_STATE_FILE)
 
 
 def get_worker_state():
