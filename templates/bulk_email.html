@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+{% block title %}Bulk Email — Stagify Email Admin{% endblock %}
+{% block body %}
+{% set active_nav = "bulk" %}
+{% include "_header.html" %}
+<main>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      <div class="flash {{ category }}">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  <div class="card">
+    <h3>Parameterized bulk email</h3>
+    <p class="muted" style="margin-top:0;">
+      Send a custom Stagify-branded email to many recipients. Upload a CSV, write one template with
+      <code>{placeholders}</code>, preview with real data, then batch send.
+    </p>
+
+    <div class="bulk-help">
+      <h4>How it works</h4>
+      <ol>
+        <li><strong>Upload a CSV</strong> — first column is always email addresses; every other column is a parameter.</li>
+        <li><strong>Write your email</strong> — use <code>{ColumnName}</code> anywhere in the subject or body (names must match CSV headers).</li>
+        <li><strong>Optional images</strong> — add image URLs below, then insert <code>{image1}</code>, <code>{image2}</code>, etc. in the body.</li>
+        <li><strong>Preview</strong> — see the rendered email for a sample recipient before sending.</li>
+        <li><strong>Batch send</strong> — sends one personalized email per CSV row.</li>
+      </ol>
+
+      <h4>Example CSV (<code>Example.csv</code>)</h4>
+      <pre class="bulk-example">Email,Name
+bob@gmail.com,Bob Jones
+akahn@outlook.com,Alex Kahn</pre>
+
+      <h4>Example subject</h4>
+      <pre class="bulk-example">A note for {Name}</pre>
+
+      <h4>Example body</h4>
+      <pre class="bulk-example">Hello {Name},
+
+We are excited to show you our new update!
+
+{image1}
+
+Try it today at stagify.ai.</pre>
+
+      <p class="muted">
+        Emails use the same blue <strong>stagify.ai</strong> header and Stagify Team footer as staging emails.
+        You choose the sign-off line (e.g. “Sincerely”, “With love”) instead of “Check us out”.
+      </p>
+    </div>
+  </div>
+
+  <div class="card csv-card">
+    <h3>1. Recipient CSV</h3>
+    <form method="post" action="{{ url_for('bulk_email_upload') }}" enctype="multipart/form-data">
+      <div class="csv-upload-row">
+        <input type="file" name="csv_file" class="csv-file-input" accept=".csv,text/csv" required />
+        <button class="btn btn-primary btn-sm" type="submit">Upload CSV</button>
+      </div>
+    </form>
+    {% if campaign.rows %}
+    <p class="muted" style="margin:12px 0 0;">
+      <strong>{{ campaign.csv_name }}</strong> —
+      {{ campaign.rows|length }} recipient(s)
+      {% if campaign.skipped %} · {{ campaign.skipped|length }} skipped{% endif %}
+      {% if campaign.uploaded_at %} · uploaded {{ campaign.uploaded_at[:16].replace('T', ' ') }}{% endif %}
+    </p>
+    {% if campaign.columns %}
+    <p class="muted">Columns: {{ campaign.columns|join(', ') }}</p>
+    {% endif %}
+    <details style="margin-top:8px;">
+      <summary class="muted">Preview first rows</summary>
+      <table class="table-compact" style="margin-top:8px;">
+        <thead>
+          <tr>
+            <th>Email</th>
+            {% for col in campaign.columns[1:] %}
+            <th>{{ col }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in campaign.rows[:5] %}
+          <tr>
+            <td>{{ row.email }}</td>
+            {% for col in campaign.columns[1:] %}
+            <td>{{ row.params.get(col, '') }}</td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </details>
+    {% else %}
+    <p class="muted csv-empty">No CSV uploaded yet.</p>
+    {% endif %}
+  </div>
+
+  <form method="post" action="{{ url_for('bulk_email_save') }}" id="bulk-template-form">
+    <div class="card">
+      <h3>2. Email template</h3>
+
+      <label for="subject">Subject</label>
+      <input type="text" id="subject" name="subject"
+             value="{{ campaign.subject or '' }}"
+             placeholder="Hello {Name} — quick update from Stagify" />
+
+      <label for="body">Body</label>
+      <textarea id="body" name="body" rows="10"
+                placeholder="Hello {Name},&#10;&#10;We are excited to show you our new update!">{{ campaign.body or '' }}</textarea>
+
+      <label for="sign_off">Sign-off <span class="muted">(replaces “Check us out” in the footer)</span></label>
+      <input type="text" id="sign_off" name="sign_off"
+             value="{{ campaign.sign_off or 'Sincerely' }}"
+             placeholder="Sincerely" />
+
+      <label for="image_urls">Image URLs <span class="muted">(one per line — use {image1}, {image2}, … in the body)</span></label>
+      <textarea id="image_urls" name="image_urls" rows="3"
+                placeholder="https://example.com/photo.jpg">{% if campaign.image_urls %}{{ campaign.image_urls|join('\n') }}{% endif %}</textarea>
+
+      <div class="row-actions" style="margin-top:12px;">
+        <button class="btn btn-muted" type="submit">Save template</button>
+      </div>
+    </div>
+  </form>
+
+  <div class="card">
+    <h3>3. Preview &amp; send</h3>
+    {% if campaign.rows %}
+    <form method="post" action="{{ url_for('bulk_email_preview_post') }}" class="inline" style="margin-bottom:12px;">
+      <input type="hidden" name="subject" id="preview-subject" value="" />
+      <input type="hidden" name="body" id="preview-body" value="" />
+      <input type="hidden" name="sign_off" id="preview-sign-off" value="" />
+      <input type="hidden" name="image_urls" id="preview-image-urls" value="" />
+      <label class="muted" for="preview_row">Preview as recipient #</label>
+      <select name="preview_row" id="preview_row">
+        {% for row in campaign.rows[:20] %}
+        <option value="{{ loop.index0 }}">{{ row.email }}{% if campaign.columns|length > 1 %} — {{ row.params.get(campaign.columns[1], '') }}{% endif %}</option>
+        {% endfor %}
+      </select>
+      <button class="btn btn-primary btn-sm" type="submit" onclick="syncBulkFields()">Update preview</button>
+    </form>
+    <div class="bulk-preview-wrap">
+      <iframe id="bulk-preview-frame"
+              title="Email preview"
+              src="{{ url_for('bulk_email_preview', row=preview_row) if campaign.body else '' }}"></iframe>
+    </div>
+
+    <form method="post" action="{{ url_for('bulk_email_send') }}"
+          onsubmit="syncBulkFields(); return confirm('Send {{ campaign.rows|length }} personalized email(s)?{% if debug_settings.enabled and debug_settings.email %} All will go to {{ debug_settings.email }} (debug mode).{% endif %}');"
+          style="margin-top:16px;">
+      <input type="hidden" name="subject" id="send-subject" value="" />
+      <input type="hidden" name="body" id="send-body" value="" />
+      <input type="hidden" name="sign_off" id="send-sign-off" value="" />
+      <input type="hidden" name="image_urls" id="send-image-urls" value="" />
+      <button class="btn btn-primary" type="submit">Batch send to {{ campaign.rows|length }} recipient(s)</button>
+    </form>
+    {% else %}
+    <p class="muted">Upload a CSV and write a template to enable preview and batch send.</p>
+    {% endif %}
+    {% if debug_settings.enabled and debug_settings.email %}
+    <p class="debug-banner">Debug active — batch sends go to <strong>{{ debug_settings.email }}</strong></p>
+    {% endif %}
+  </div>
+</main>
+<script>
+function syncBulkFields() {
+  var subject = document.getElementById('subject');
+  var body = document.getElementById('body');
+  var signOff = document.getElementById('sign_off');
+  var images = document.getElementById('image_urls');
+  if (!subject || !body) return true;
+  ['preview', 'send'].forEach(function (prefix) {
+    var s = document.getElementById(prefix + '-subject');
+    var b = document.getElementById(prefix + '-body');
+    var g = document.getElementById(prefix + '-sign-off');
+    var i = document.getElementById(prefix + '-image-urls');
+    if (s) s.value = subject.value;
+    if (b) b.value = body.value;
+    if (g) g.value = signOff ? signOff.value : '';
+    if (i) i.value = images ? images.value : '';
+  });
+  return true;
+}
+document.getElementById('bulk-template-form') && document.getElementById('bulk-template-form')
+  .addEventListener('submit', syncBulkFields);
+</script>
+{% endblock %}

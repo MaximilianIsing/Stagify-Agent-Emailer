@@ -42,6 +42,8 @@ from email_engine import (
     extract_b64_and_mime,
     send_email,
 )
+from bulk_email_engine import render_bulk_email_for_recipient, send_html_email
+from bulk_email_store import get_campaign, parse_recipient_csv, save_template
 from sent_registry import (
     DuplicateSendError,
     finalize_send,
@@ -529,6 +531,145 @@ def restage_all_drafts():
     if not restaged and not errors:
         flash(f"No {label} drafts to restage.", "error")
     return redirect(url_for("dashboard", status="pending" if restaged else label))
+
+
+def _bulk_campaign_from_form():
+    return save_template(
+        request.form.get("subject", ""),
+        request.form.get("body", ""),
+        request.form.get("sign_off", "Sincerely"),
+        request.form.get("image_urls", ""),
+    )
+
+
+@app.route("/bulk-email")
+@login_required
+def bulk_email():
+    campaign = get_campaign()
+    debug_settings = load_debug_settings()
+    try:
+        preview_row = int(request.args.get("preview_row", 0))
+    except ValueError:
+        preview_row = 0
+    if campaign.get("rows"):
+        preview_row = max(0, min(preview_row, len(campaign["rows"]) - 1))
+    else:
+        preview_row = 0
+    return render_template(
+        "bulk_email.html",
+        campaign=campaign,
+        debug_settings=debug_settings,
+        active_nav="bulk",
+        preview_row=preview_row,
+    )
+
+
+@app.post("/bulk-email/upload")
+@login_required
+def bulk_email_upload():
+    file = request.files.get("csv_file")
+    try:
+        entry = parse_recipient_csv(file)
+        msg = (
+            f"Uploaded {entry['csv_name']} — {len(entry['rows'])} recipient(s)"
+        )
+        if entry.get("skipped"):
+            msg += f", {len(entry['skipped'])} skipped"
+        flash(msg, "success")
+    except ValueError as exc:
+        flash(str(exc), "error")
+    return redirect(url_for("bulk_email"))
+
+
+@app.post("/bulk-email/save")
+@login_required
+def bulk_email_save():
+    _bulk_campaign_from_form()
+    flash("Email template saved.", "success")
+    return redirect(url_for("bulk_email"))
+
+
+@app.route("/bulk-email/preview")
+@login_required
+def bulk_email_preview():
+    campaign = get_campaign()
+    if not campaign.get("rows"):
+        abort(404)
+    try:
+        row_index = int(request.args.get("row", 0))
+    except ValueError:
+        row_index = 0
+    row_index = max(0, min(row_index, len(campaign["rows"]) - 1))
+    row = campaign["rows"][row_index]
+    track_email = tracking_email_for_send(row["email"])
+    _, html = render_bulk_email_for_recipient(
+        campaign,
+        row,
+        track_opens=True,
+        tracking_email=track_email,
+    )
+    return html
+
+
+@app.post("/bulk-email/preview")
+@login_required
+def bulk_email_preview_post():
+    campaign = _bulk_campaign_from_form()
+    if not campaign.get("rows"):
+        flash("Upload a recipient CSV before previewing.", "error")
+        return redirect(url_for("bulk_email"))
+    try:
+        row_index = int(request.form.get("preview_row", 0))
+    except ValueError:
+        row_index = 0
+    row_index = max(0, min(row_index, len(campaign["rows"]) - 1))
+    return redirect(url_for("bulk_email", preview_row=row_index))
+
+
+@app.post("/bulk-email/send")
+@login_required
+def bulk_email_send():
+    campaign = _bulk_campaign_from_form()
+    rows = campaign.get("rows") or []
+    if not rows:
+        flash("Upload a recipient CSV before sending.", "error")
+        return redirect(url_for("bulk_email"))
+    if not (campaign.get("subject") or "").strip():
+        flash("Subject line is required.", "error")
+        return redirect(url_for("bulk_email"))
+    if not (campaign.get("body") or "").strip():
+        flash("Email body is required.", "error")
+        return redirect(url_for("bulk_email"))
+
+    sent = 0
+    failed = []
+    debug_settings = load_debug_settings()
+
+    for row in rows:
+        try:
+            track_email = tracking_email_for_send(row["email"])
+            subject, html = render_bulk_email_for_recipient(
+                campaign,
+                row,
+                track_opens=True,
+                tracking_email=track_email,
+            )
+            send_html_email(row["email"], subject, html)
+            sent += 1
+        except Exception as exc:
+            logger.exception("Bulk send failed for %s", row.get("email"))
+            failed.append((row.get("email", "?"), str(exc)))
+
+    if sent:
+        flash(f"Sent {sent} email(s).", "success")
+    if failed:
+        sample = "; ".join(f"{email}: {err}" for email, err in failed[:3])
+        extra = f" (+{len(failed) - 3} more)" if len(failed) > 3 else ""
+        flash(f"{len(failed)} send(s) failed. {sample}{extra}", "error")
+    if not sent and not failed:
+        flash("Nothing to send.", "error")
+
+    return redirect(url_for("bulk_email"))
 
 
 def create_app():
