@@ -17,17 +17,20 @@ from flask import (
 from config import DATA_DIR, load_config, normalize_password
 from csv_store import delete_csv, get_csv, get_parse_report, list_csvs, reconcile_csv_registry, save_upload, set_csv_active
 from debug_settings import load_debug_settings, save_debug_settings, tracking_email_for_send
+from storage_settings import load_storage_settings, save_storage_settings
 from row_range import format_row_range
 from draft_store import (
     DISCARDABLE_STATUSES,
     RESTAGEABLE_STATUSES,
     count_by_status,
+    delete_draft_files,
     discard_draft,
     get_draft,
     get_email_html,
     get_original_image,
     get_staged_data,
     list_drafts,
+    purge_sent_drafts,
     reject_all_pending,
     restage_all_failed,
     restage_all_rejected,
@@ -121,6 +124,7 @@ def dashboard():
         worker=get_worker_state(),
         status_filter=status_filter,
         debug_settings=load_debug_settings(),
+        storage_settings=load_storage_settings(),
         csv_uploads=list_csvs(),
         active_nav="dashboard",
     )
@@ -140,6 +144,37 @@ def update_debug_settings():
     except ValueError as exc:
         flash(str(exc), "error")
     return redirect(url_for("dashboard", status=request.form.get("status", "pending")))
+
+
+@app.post("/settings/storage")
+@login_required
+def update_storage_settings():
+    auto_delete = request.form.get("auto_delete_sent_drafts") == "on"
+    save_storage_settings(auto_delete)
+    if auto_delete:
+        flash(
+            "Auto-delete on — draft files removed after each successful send. "
+            "Duplicate prevention still uses the sent registry.",
+            "success",
+        )
+    else:
+        flash("Auto-delete off — sent drafts stay on disk.", "success")
+    return redirect(url_for("dashboard", status=request.form.get("status", "sent")))
+
+
+@app.post("/drafts/purge-sent")
+@login_required
+def purge_sent_drafts_route():
+    count = purge_sent_drafts()
+    if count:
+        flash(
+            f"Purged {count} sent draft(s) from disk. "
+            "Sent registry unchanged — those recipients cannot be emailed again.",
+            "success",
+        )
+    else:
+        flash("No sent drafts to purge.", "error")
+    return redirect(url_for("dashboard", status="sent"))
 
 
 @app.post("/csvs/upload")
@@ -362,6 +397,8 @@ def _send_draft_email(draft_id, draft):
             resend_id=resend_id,
             error=None,
         )
+        if load_storage_settings()["auto_delete_sent_drafts"]:
+            delete_draft_files(draft_id)
         flash(f"Sent to {draft['email']}.", "success")
         return "sent"
     except DuplicateSendError as exc:
