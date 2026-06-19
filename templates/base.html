@@ -147,24 +147,31 @@
       align-items: center;
       gap: 10px;
     }
-    .site-nav {
+    .header-nav {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .nav-pill-group {
       display: flex;
       gap: 4px;
       background: var(--surface-3);
       padding: 4px;
       border-radius: 999px;
     }
-    .site-nav a {
+    .nav-pill-group a {
       color: var(--muted);
       text-decoration: none;
       padding: 7px 15px;
       border-radius: 999px;
       font-size: 13px;
       font-weight: 600;
+      white-space: nowrap;
       transition: color .15s ease, background .15s ease;
     }
-    .site-nav a:hover { color: var(--text); }
-    .site-nav a.active {
+    .nav-pill-group a:hover { color: var(--text); }
+    .nav-pill-group a.active {
       background: var(--surface);
       color: var(--brand);
       box-shadow: var(--shadow-sm);
@@ -755,6 +762,48 @@
       main { padding: 22px 16px 44px; }
       header { padding: 12px 16px; }
     }
+
+    .bulk-help {
+      background: var(--surface-alt, #f8fbff);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin-top: 12px;
+    }
+    .bulk-help h4 {
+      margin: 14px 0 8px;
+      font-size: 13px;
+    }
+    .bulk-help h4:first-child { margin-top: 0; }
+    .bulk-help ol {
+      margin: 0 0 12px;
+      padding-left: 20px;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    .bulk-example {
+      background: #1e293b;
+      color: #e2e8f0;
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      overflow-x: auto;
+      margin: 0 0 8px;
+    }
+    .bulk-preview-wrap {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      background: white;
+    }
+    .bulk-preview-wrap iframe {
+      display: block;
+      width: 100%;
+      height: 720px;
+      border: 0;
+    }
+    label { display: block; font-size: 13px; font-weight: 600; margin: 12px 0 6px; }
+    textarea { width: 100%; font-family: inherit; }
   </style>
 </head>
 <body>
