@@ -241,8 +241,32 @@
   </div>
 
   <div class="card" id="sent">
-    <h3>Sent Registry <span class="muted" style="font-weight:500;">· duplicate prevention</span></h3>
-    <p class="muted">Each recipient email can only be sent once. Recent sends:</p>
+    <h3>Sent registry <span class="muted" style="font-weight:500;">· duplicate prevention</span></h3>
+    <p class="muted">Each recipient email can only be sent once. Recent sends stay here even if draft files are deleted.</p>
+
+    <form method="post" action="{{ url_for('update_storage_settings') }}" style="margin-bottom:16px;">
+      <input type="hidden" name="status" value="{{ status_filter }}" />
+      <label class="debug-toggle">
+        <input type="checkbox" name="auto_delete_sent_drafts"
+               {% if storage_settings.auto_delete_sent_drafts %}checked{% endif %} />
+        Auto-delete draft files after successful send
+      </label>
+      <p class="muted" style="margin:0 0 10px; font-size:12px;">
+        Frees disk space. Only removes staged images and preview files — not the sent registry.
+        Debug sends are never auto-deleted.
+      </p>
+      <button class="btn btn-primary btn-sm" type="submit">Save storage setting</button>
+    </form>
+
+    {% if counts.sent > 0 %}
+    <form method="post" action="{{ url_for('purge_sent_drafts_route') }}"
+          onsubmit="return confirm('Delete all {{ counts.sent }} sent draft folder(s) from disk? Sent registry is kept — no duplicate sends.')"
+          style="margin-bottom:16px;">
+      <button class="btn btn-danger btn-sm" type="submit">Purge all sent drafts ({{ counts.sent }})</button>
+    </form>
+    {% endif %}
+
+    <p class="muted">Recent sends:</p>
     {% if sent_records %}
     <table>
       <thead>

@@ -1,4 +1,5 @@
 import json
+import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -267,6 +268,24 @@ def reject_all_pending():
         update_draft(draft["id"], status="rejected", error=None)
         count += 1
     return count
+
+
+def delete_draft_files(draft_id):
+    """Remove draft folder from disk. Does not affect sent registry."""
+    folder = draft_dir(draft_id)
+    if not folder.exists():
+        return False
+    shutil.rmtree(folder)
+    return True
+
+
+def purge_sent_drafts():
+    """Delete on-disk files for all sent drafts. Sent registry unchanged."""
+    deleted = 0
+    for draft in list_drafts(status="sent"):
+        if delete_draft_files(draft["id"]):
+            deleted += 1
+    return deleted
 
 
 def discard_draft(draft_id):
